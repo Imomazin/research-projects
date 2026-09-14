@@ -1,9 +1,9 @@
 # Research Projects
 
-Private academic research repository for journal-oriented research projects.
+Private standalone repository for academic research projects, analysis and journal submissions.
 
-## Active Project
+## Active project
 
-- Strategic Organization
+- **Strategic Organization**: strategic capability asymmetry and occupational GenAI exposure
 
-Research data should only be stored here when repository visibility is PRIVATE.
+Research material in this repository is intentionally kept separate from software, product and intelligence-build repositories.
