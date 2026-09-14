@@ -1,0 +1,70 @@
+name: Fetch Strategic Organization exemplar PDF
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fetch-strategic-organization-exemplar.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-exemplar:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch final published open-access exemplar
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT='Strategic Organization/05 Manuscript/Exemplar Paper/Faraj_Perez-Torrents_Mantere_Bhardwaj_2026_A_Time_for_Monsters.pdf'
+          URL='https://research.cbs.dk/files/127402879/faraj-et-al-2025-a-time-for-monsters-organizational-knowing-after-large-language-models.pdf'
+          mkdir -p "$(dirname "$OUT")"
+          ok=0
+          for suffix in '' '?download=1'; do
+            if curl -L --fail --retry 2 --retry-delay 2 \
+              -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
+              -H 'Accept: application/pdf,application/octet-stream;q=0.9,*/*;q=0.8' \
+              -H 'Referer: https://research.cbs.dk/en/publications/a-time-for-monsters-organizational-knowing-after-large-language-m/' \
+              "${URL}${suffix}" -o "$OUT"; then
+                if python - "$OUT" <<'PY'
+          import sys
+          from pathlib import Path
+          p = Path(sys.argv[1])
+          b = p.read_bytes()
+          ok = b.startswith(b'%PDF') and len(b) > 200000
+          print(f'bytes={len(b):,} valid_pdf={ok}')
+          raise SystemExit(0 if ok else 1)
+          PY
+                then ok=1; break; fi
+            fi
+          done
+          if [ "$ok" != 1 ]; then
+            echo 'CBS download failed; trying Sage final PDF endpoint.'
+            curl -L --fail --retry 2 --retry-delay 2 \
+              -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
+              -H 'Accept: application/pdf,*/*;q=0.8' \
+              -H 'Referer: https://journals.sagepub.com/doi/10.1177/14761270251410675' \
+              'https://journals.sagepub.com/doi/pdf/10.1177/14761270251410675?download=true' -o "$OUT"
+            python - "$OUT" <<'PY'
+          import sys
+          from pathlib import Path
+          p = Path(sys.argv[1])
+          b = p.read_bytes()
+          assert b.startswith(b'%PDF') and len(b) > 200000, (len(b), b[:20])
+          print(f'Validated exemplar PDF: {len(b):,} bytes')
+          PY
+          fi
+      - name: Commit exemplar and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add 'Strategic Organization/05 Manuscript/Exemplar Paper/'
+          git rm -f '.github/workflows/fetch-strategic-organization-exemplar.yml'
+          git commit -m 'Add final published Strategic Organization exemplar PDF'
+          git push
