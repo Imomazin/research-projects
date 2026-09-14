@@ -1,17 +1,13 @@
-# Strategic Organization Exemplar Paper
+# Strategic Organization exemplar papers
 
-## Selected exemplar
+## Stored full accepted manuscript
 
-Patrick Figge, Edward Anderson and Kyle Lewis (2026), **AI-human learning systems: Investigating the strategic role of AI for organizational learning**, *Strategic Organization*, 24(2), 307–342.
+Xule Lin and Kevin G. Corley (2026), **Interpretive Orchestration: An Essay Exploring the Epistemic Intersection of Human Intuition and Machine Intelligence**, *Strategic Organization*, advance online publication. DOI: 10.1177/14761270261448645.
 
-DOI: 10.1177/14761270251385860
+The authors maintain a public repository containing the complete accepted manuscript and a CC BY 4.0 licence. The PDF stored here was generated directly from that accepted manuscript. Use it as a journal-authentic benchmark for framing, theory positioning, conceptual development, contribution architecture, transitions and discussion style. Do not copy wording.
 
-Why this paper was selected:
+## Closest conceptual comparator for this project
 
-- published in the target journal
-- directly addresses AI, strategic organization and organizational capabilities
-- links individual and collective capability processes to organizational outcomes
-- demonstrates how to establish a strategic problem, anchor it in organization theory and build a clear contribution
-- open access under CC BY 4.0
+Patrick Figge, Edward Anderson and Kyle Lewis (2026), **AI-human learning systems: Investigating the strategic role of AI for organizational learning**, *Strategic Organization*, 24(2), 307–342. DOI: 10.1177/14761270251385860.
 
-The publisher PDF is referenced in the accompanying URL file. Use the paper as a structural and rhetorical benchmark, not as a source for copied prose.
+The accompanying URL file and Writing Style Blueprint retain the Figge et al. paper as the closest conceptual comparator for the Strategic AI capability paper.
