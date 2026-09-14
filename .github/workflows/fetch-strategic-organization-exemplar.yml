@@ -16,45 +16,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Render open-access Strategic Organization article to PDF
+      - name: Render author-uploaded Strategic Organization article to PDF
         shell: bash
         run: |
           set -euo pipefail
-          OUT='Strategic Organization/05 Manuscript/Exemplar Paper/Figge_Anderson_Lewis_2026_AI-Human_Learning_Systems_reference.pdf'
+          OUT='Strategic Organization/05 Manuscript/Exemplar Paper/Faraj_Perez-Torrents_Mantere_Bhardwaj_2026_A_Time_for_Monsters_reference.pdf'
+          URL='https://www.researchgate.net/publication/397755478_A_time_for_monsters_Organizational_knowing_after_large_language_models'
           mkdir -p "$(dirname "$OUT")"
           CHROME=$(command -v google-chrome || command -v chromium || command -v chromium-browser)
           test -n "$CHROME"
-          urls=(
-            'https://journals.sagepub.com/doi/full/10.1177/14761270251385860'
-            'https://www.researchgate.net/publication/395945398_AI-human_learning_systems_Investigating_the_strategic_role_of_AI_for_organizational_learning'
-          )
-          ok=0
-          for URL in "${urls[@]}"; do
-            rm -f "$OUT"
-            "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
-              --virtual-time-budget=12000 --print-to-pdf="$OUT" "$URL" || true
-            if [ -f "$OUT" ]; then
-              python -m pip install --quiet pypdf
-              if python - "$OUT" <<'PY'
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
+            --virtual-time-budget=20000 --print-to-pdf="$OUT" "$URL" || true
+          python -m pip install --quiet pypdf
+          python - "$OUT" <<'PY'
           import sys
           from pathlib import Path
           from pypdf import PdfReader
-          p=Path(sys.argv[1]); b=p.read_bytes()
-          if not b.startswith(b'%PDF') or len(b) < 100000:
-              raise SystemExit(1)
-          text='\n'.join((page.extract_text() or '') for page in PdfReader(str(p))[:5])
-          good='AI-human learning systems' in text and ('Strategic Organization' in text or 'organizational learning' in text)
-          print(f'bytes={len(b):,} pages={len(PdfReader(str(p)))} title_valid={good}')
+          p=Path(sys.argv[1])
+          b=p.read_bytes()
+          r=PdfReader(str(p))
+          text='\n'.join((page.extract_text() or '') for page in r.pages)
+          low=text.lower()
+          good=(b.startswith(b'%PDF') and len(b)>100000 and len(r.pages)>=5 and
+                'a time for monsters' in low and 'organizational knowing' in low)
+          print(f'bytes={len(b):,} pages={len(r.pages)} title_valid={good}')
           raise SystemExit(0 if good else 1)
           PY
-              then ok=1; break; fi
-            fi
-          done
-          test "$ok" = 1
-      - name: Commit exemplar and remove temporary workflow
+      - name: Commit exemplar, reference metadata and remove temporary workflow
         shell: bash
         run: |
           set -euo pipefail
+          cat > 'Strategic Organization/05 Manuscript/Exemplar Paper/A Time for Monsters - Strategic Organization.url' <<'EOF'
+          [InternetShortcut]
+          URL=https://doi.org/10.1177/14761270251410675
+          EOF
+          cat > 'Strategic Organization/05 Manuscript/Exemplar Paper/README.md' <<'EOF'
+          # Strategic Organization exemplar papers
+
+          ## Stored reference PDF
+
+          Samer Faraj, Joël Perez-Torrents, Saku Mantere and Anand Bhardwaj (2026), **A Time for Monsters: Organizational Knowing After Large Language Models**, *Strategic Organization*, 24(2), 343–356. DOI: 10.1177/14761270251410675.
+
+          The PDF stored here is a browser-rendered reference copy of the authors' publicly available open-access article page. It is included to benchmark journal-level framing, theory development, argument architecture, transitions and discussion style. Do not copy wording.
+
+          ## Closest conceptual exemplar
+
+          Patrick Figge, Edward Anderson and Kyle Lewis (2026), **AI-human learning systems: Investigating the strategic role of AI for organizational learning**, *Strategic Organization*, 24(2), 307–342. DOI: 10.1177/14761270251385860.
+
+          The accompanying URL file and Writing Style Blueprint retain this paper as the closest conceptual benchmark for the current project.
+          EOF
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add 'Strategic Organization/05 Manuscript/Exemplar Paper/'
