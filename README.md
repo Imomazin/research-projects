@@ -1,9 +1,9 @@
 # Research Projects
 
-Private repository for academic research projects and journal submissions.
+Private academic research repository for journal-oriented research projects.
 
-## Current project
+## Active Project
 
 - Strategic Organization
 
-The Strategic Organization project is kept fully separate from software and intelligence-build repositories.
+Research data should only be stored here when repository visibility is PRIVATE.

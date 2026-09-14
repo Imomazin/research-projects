@@ -1,0 +1,40 @@
+name: Install Strategic Organization assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.transfer/strategic_org_assets.zip'
+      - '.github/workflows/install-strategic-org-assets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install-assets:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and unpack research assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f '.transfer/strategic_org_assets.zip'
+          echo '46ade7fc224da36da0a54b929bc84662b021c07716d435f9eb5d46076f560dae  .transfer/strategic_org_assets.zip' | sha256sum -c -
+          unzip -o '.transfer/strategic_org_assets.zip' -d .
+          test "$(stat -c%s 'Strategic Organization/01 Primary Data/Compiled Participants Data_v2.xlsx')" = '42802'
+          test "$(stat -c%s 'Strategic Organization/03 Data Integration/Strategic_Organization_Integrated_Dataset.xlsx')" = '124373'
+          test "$(stat -c%s 'Strategic Organization/03 Data Integration/Strategic_Organization_Analysis_Ready.xlsx')" = '16935'
+      - name: Commit verified research assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add 'Strategic Organization'
+          git rm -f '.transfer/strategic_org_assets.zip'
+          git rm -f '.github/workflows/install-strategic-org-assets.yml'
+          git commit -m 'Install verified Strategic Organization research assets'
+          git push

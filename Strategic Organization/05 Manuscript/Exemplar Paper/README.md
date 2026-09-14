@@ -1,11 +1,17 @@
-# Strategic Organization exemplar paper
+# Strategic Organization Exemplar Paper
 
-Primary writing-style exemplar:
+## Selected exemplar
 
-Patrick Figge, Edward Anderson and Kyle Lewis. "AI-human learning systems: Investigating the strategic role of AI for organizational learning." Strategic Organization, 24(2), 307–342. DOI: 10.1177/14761270251385860.
+Patrick Figge, Edward Anderson and Kyle Lewis (2026), **AI-human learning systems: Investigating the strategic role of AI for organizational learning**, *Strategic Organization*, 24(2), 307–342.
 
-This is a 2026 Strategic Organization research article focused directly on AI, organizational learning, capabilities and strategic organization. The publisher identifies the article as open access under the Creative Commons Attribution 4.0 licence.
+DOI: 10.1177/14761270251385860
 
-Use it as a benchmark for problem framing, theory positioning, contribution architecture, transitions, discussion structure and journal-level prose. Do not copy language or arguments.
+Why this paper was selected:
 
-Publisher PDF: https://journals.sagepub.com/doi/pdf/10.1177/14761270251385860
+- published in the target journal
+- directly addresses AI, strategic organization and organizational capabilities
+- links individual and collective capability processes to organizational outcomes
+- demonstrates how to establish a strategic problem, anchor it in organization theory and build a clear contribution
+- open access under CC BY 4.0
+
+The publisher PDF is referenced in the accompanying URL file. Use the paper as a structural and rhetorical benchmark, not as a source for copied prose.

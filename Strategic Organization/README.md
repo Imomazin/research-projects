@@ -2,7 +2,7 @@
 
 Target journal: Strategic Organization
 
-This project contains the primary participant data, secondary ILO occupational exposure data, occupation coding crosswalks, integrated analysis datasets, validation outputs, manuscript materials and submission files.
+Working research focus: strategic capability asymmetry and occupational GenAI exposure, using participant-level capability data linked to ISCO-08 and the ILO 2025 Generative AI occupational exposure framework.
 
 ## Folder structure
 
@@ -13,4 +13,4 @@ This project contains the primary participant data, secondary ILO occupational e
 - 05 Manuscript
 - 06 Submission
 
-The project is maintained in this standalone private research repository and is not part of any software or intelligence-build repository.
+Participant-level and integrated datasets must only be stored when this repository is PRIVATE.
