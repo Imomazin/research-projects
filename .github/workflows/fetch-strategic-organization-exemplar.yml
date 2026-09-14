@@ -16,29 +16,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch author-uploaded open-access exemplar
+      - name: Render open-access Strategic Organization article to PDF
         shell: bash
         run: |
           set -euo pipefail
-          OUT='Strategic Organization/05 Manuscript/Exemplar Paper/Faraj_Perez-Torrents_Mantere_Bhardwaj_2026_A_Time_for_Monsters.pdf'
+          OUT='Strategic Organization/05 Manuscript/Exemplar Paper/Figge_Anderson_Lewis_2026_AI-Human_Learning_Systems_reference.pdf'
           mkdir -p "$(dirname "$OUT")"
+          CHROME=$(command -v google-chrome || command -v chromium || command -v chromium-browser)
+          test -n "$CHROME"
           urls=(
-            'https://www.researchgate.net/profile/Anand-Bhardwaj-5/publication/397755478_A_time_for_monsters_Organizational_knowing_after_large_language_models/links/691ddb72ba4fcf00661a8589/A-time-for-monsters-Organizational-knowing-after-large-language-models.pdf'
-            'https://www.researchgate.net/profile/Anand-Bhardwaj-5/publication/397755478_A_time_for_monsters_Organizational_knowing_after_large_language_models/links/691ddb72ba4fcf00661a8589/A-time-for-monsters-Organizational-knowing-after-large-language-models.pdf?origin=publication_detail'
+            'https://journals.sagepub.com/doi/full/10.1177/14761270251385860'
+            'https://www.researchgate.net/publication/395945398_AI-human_learning_systems_Investigating_the_strategic_role_of_AI_for_organizational_learning'
           )
           ok=0
           for URL in "${urls[@]}"; do
-            if curl -L --fail --retry 2 --retry-delay 2 \
-              -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
-              -H 'Accept: application/pdf,application/octet-stream;q=0.9,*/*;q=0.8' \
-              -H 'Referer: https://www.researchgate.net/publication/397755478_A_time_for_monsters_Organizational_knowing_after_large_language_models' \
-              "$URL" -o "$OUT"; then
+            rm -f "$OUT"
+            "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
+              --virtual-time-budget=12000 --print-to-pdf="$OUT" "$URL" || true
+            if [ -f "$OUT" ]; then
+              python -m pip install --quiet pypdf
               if python - "$OUT" <<'PY'
           import sys
           from pathlib import Path
+          from pypdf import PdfReader
           p=Path(sys.argv[1]); b=p.read_bytes()
-          good=b.startswith(b'%PDF') and len(b)>100000
-          print(f'bytes={len(b):,} valid_pdf={good}')
+          if not b.startswith(b'%PDF') or len(b) < 100000:
+              raise SystemExit(1)
+          text='\n'.join((page.extract_text() or '') for page in PdfReader(str(p))[:5])
+          good='AI-human learning systems' in text and ('Strategic Organization' in text or 'organizational learning' in text)
+          print(f'bytes={len(b):,} pages={len(PdfReader(str(p)))} title_valid={good}')
           raise SystemExit(0 if good else 1)
           PY
               then ok=1; break; fi
@@ -53,5 +59,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add 'Strategic Organization/05 Manuscript/Exemplar Paper/'
           git rm -f '.github/workflows/fetch-strategic-organization-exemplar.yml'
-          git commit -m 'Add Strategic Organization exemplar PDF'
+          git commit -m 'Add Strategic Organization exemplar reference PDF'
           git push
