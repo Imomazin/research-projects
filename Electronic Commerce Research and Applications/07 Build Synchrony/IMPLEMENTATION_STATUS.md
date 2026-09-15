@@ -20,9 +20,11 @@
 - incremental channel-effect attribution summary
 - deterministic semi-synthetic causal benchmark generator with known sample ATE
 
-### Budget decision layer
+### Decision layer
 
 - exact deterministic causal budget optimiser over discretised channel response options
+- uplift-based treatment recommendation policy separating persuadable, likely-anyway, low-response and harmful cases
+- expected incremental value check before treatment recommendation
 - existing rule-based publish-time optimiser remains untouched as the non-causal product baseline
 
 ## Existing inherited Orbit baseline
@@ -39,7 +41,7 @@
 - nuisance-model training for propensity and potential outcomes
 - channel-sequence causal discovery
 - path-specific mediation engine
-- uplift/CATE learner
+- CATE/uplift learner itself (the decision policy now exists but consumes externally estimated potential outcomes)
 - Criteo data ingestion and validation
 - production UI for causal diagnostics
 - prospective SkillHubs validation
