@@ -16,6 +16,7 @@
 - trust-weighted aggregation baseline
 - bounded participant trust update rule
 - shape validation for aggregation inputs
+- deterministic Byzantine research attack harness with sign-flip, scaling, constant-vector and seeded Gaussian update attacks
 
 ## Existing inherited Meridian baseline
 
@@ -31,10 +32,10 @@
 - cryptographic secure aggregation
 - final heterogeneity-aware proposed weighting algorithm
 - formal convergence proof
-- final Byzantine attack harness and experiment matrix
+- full Byzantine experiment matrix and result artefacts
 - grant-dataset preprocessing pipelines
 - synthetic compliance twin
 
 ## Evidence discipline
 
-The new robust/trust/privacy primitives are implementation progress, not empirical findings. No manuscript result is marked complete until the experiment pipeline is run on frozen configurations and datasets.
+The new robust/trust/privacy/attack primitives are implementation progress, not empirical findings. No manuscript result is marked complete until the experiment pipeline is run on frozen configurations and datasets.
