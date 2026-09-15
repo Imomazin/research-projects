@@ -1,10 +1,10 @@
 # Supplementary Checks Summary
 
-Generated 15 September 2026 14:34 from 198 mapped participants [200 in the baseline file].
+Generated 15 September 2026 14:49 from 198 mapped participants [200 in the baseline file].
 
 ## Reconciliation
 
-The script reproduced the validated manifest values with a largest absolute difference of 2.44e-15.
+The script reproduced the validated manifest values with a largest absolute difference of 0.00e+00.
 
 ## Domain profile
 
