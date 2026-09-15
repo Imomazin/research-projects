@@ -1,0 +1,142 @@
+name: Finalize Strategic Organization audit materials
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finalize-strategic-organization-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install figure dependencies
+        run: python -m pip install --quiet numpy==2.3.5 pandas==2.2.3 matplotlib
+
+      - name: Generate post-audit empirical figures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import numpy as np
+          import pandas as pd
+          import matplotlib.pyplot as plt
+          from matplotlib.collections import LineCollection
+
+          root = Path('Strategic Organization')
+          out = root / '04 Analysis' / 'Supplementary Checks' / 'Outputs'
+          out.mkdir(parents=True, exist_ok=True)
+          primary = pd.read_csv(root / '01 Primary Data' / 'Compiled Participants Data_v2.csv', dtype=str, keep_default_na=False)
+          ready = pd.read_csv(root / '03 Data Integration' / 'Strategic_Organization_Analysis_Ready.csv', dtype=str, keep_default_na=False)
+          mapped = ready[ready['ISCO-08'].astype(str).str.strip() != ''].copy()
+          conv = pd.to_numeric(mapped['Conventional Capability Index'], errors='coerce').to_numpy()
+          ai = pd.to_numeric(mapped['AI/Data Capability Index'], errors='coerce').to_numpy()
+
+          segments = [((0, c), (1, a)) for c, a in zip(conv, ai)]
+          fig, ax = plt.subplots(figsize=(7.2, 5.6))
+          ax.add_collection(LineCollection(segments, linewidths=0.7, alpha=0.18))
+          ax.scatter(np.zeros_like(conv), conv, s=8, alpha=0.25)
+          ax.scatter(np.ones_like(ai), ai, s=8, alpha=0.25)
+          ax.plot([0, 1], [np.median(conv), np.median(ai)], marker='o', linewidth=2.5, label='Median profile')
+          ax.set_xlim(-0.18, 1.18)
+          ax.set_ylim(0, 102)
+          ax.set_xticks([0, 1], ['Conventional capability', 'AI/data capability'])
+          ax.set_ylabel('Baseline score')
+          ax.legend(frameon=False)
+          fig.tight_layout()
+          fig.savefig(out / 'figure_R1_paired_domain_profile.png', dpi=300, bbox_inches='tight')
+          plt.close(fig)
+
+          conv_items = ['Strategic Thinking Pre', 'Problem Solving Pre', 'Decision Making Pre',
+                        'Leadership Pre', 'Adaptability Pre', 'Digital Capability Pre']
+          ai_items = ['AI Knowledge Pre', 'AI Application Pre', 'AI Judgement Pre', 'Data Literacy Pre']
+          keep_cols = ['Participant ID', 'Overall Baseline Score'] + conv_items + ai_items
+          df = mapped.merge(primary[keep_cols], on='Participant ID', how='left', validate='one_to_one')
+          overall = pd.to_numeric(df['Overall Baseline Score'], errors='coerce').to_numpy()
+          items = df[conv_items + ai_items].apply(pd.to_numeric, errors='coerce').to_numpy()
+          def modified_z(x):
+              med = np.median(x)
+              mad = np.median(np.abs(x - med))
+              return np.zeros_like(x) if mad == 0 else 0.6745 * (x - med) / mad
+          keep = ((overall > 0) & (items >= 10).all(axis=1) &
+                  (modified_z(conv) >= -3.5) & (modified_z(ai) >= -3.5))
+          flagged = ~keep
+
+          fig, ax = plt.subplots(figsize=(6.6, 5.8))
+          ax.scatter(conv[keep], ai[keep], s=24, alpha=0.65, label='Retained by sensitivity screen')
+          ax.scatter(conv[flagged], ai[flagged], s=42, marker='x', linewidths=1.2, label='Flagged by sensitivity screen')
+          lims = [0, 102]
+          ax.plot(lims, lims, linestyle='--', linewidth=1, label='Equal-score line')
+          ax.set_xlim(lims)
+          ax.set_ylim(lims)
+          ax.set_xlabel('Conventional capability index')
+          ax.set_ylabel('AI/data capability index')
+          ax.legend(frameon=False)
+          fig.tight_layout()
+          fig.savefig(out / 'figure_R2_capability_sorting_screened.png', dpi=300, bbox_inches='tight')
+          plt.close(fig)
+          print(f'Generated two figures; flagged observations={int(flagged.sum())}')
+          PY
+
+      - name: Retrieve licensed quantitative Strategic Organization exemplar
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='Strategic Organization/05 Manuscript/Exemplar Paper/Mack_Cho_Yi_2024_Strategic_Organization_Quantitative_Exemplar.pdf'
+          tmp='/tmp/exemplar.pdf'
+          ok=0
+          for url in \
+            'https://ink.library.smu.edu.sg/cgi/viewcontent.cgi?article=8466&context=lkcsb_research' \
+            'https://journals.sagepub.com/doi/pdf/10.1177/14761270231187090?download=true' \
+            'https://journals.sagepub.com/doi/pdf/10.1177/14761270231187090'; do
+            if curl -L --fail --retry 2 --retry-delay 2 \
+              -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
+              -H 'Accept: application/pdf,*/*;q=0.8' \
+              -H 'Referer: https://ink.library.smu.edu.sg/lkcsb_research/7467/' \
+              "$url" -o "$tmp"; then
+              if python - "$tmp" <<'PY'
+          import sys
+          p=sys.argv[1]
+          b=open(p,'rb').read()
+          raise SystemExit(0 if b.startswith(b'%PDF') and len(b) > 100000 else 1)
+          PY
+              then ok=1; break; fi
+            fi
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo 'Could not retrieve licensed exemplar PDF from available sources.' >&2
+            exit 1
+          fi
+          cp "$tmp" "$target"
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('Strategic Organization/05 Manuscript/Exemplar Paper/Mack_Cho_Yi_2024_Strategic_Organization_Quantitative_Exemplar.pdf')
+          print(f'Validated exemplar PDF: {p.stat().st_size:,} bytes')
+          PY
+
+      - name: Commit figures and exemplar and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add 'Strategic Organization/04 Analysis/Supplementary Checks/Outputs/figure_R1_paired_domain_profile.png'
+          git add 'Strategic Organization/04 Analysis/Supplementary Checks/Outputs/figure_R2_capability_sorting_screened.png'
+          git add 'Strategic Organization/05 Manuscript/Exemplar Paper/Mack_Cho_Yi_2024_Strategic_Organization_Quantitative_Exemplar.pdf'
+          git rm '.github/workflows/finalize-strategic-organization-audit.yml'
+          git commit -m 'Add post-audit figures and quantitative Strategic Organization exemplar'
+          git push
