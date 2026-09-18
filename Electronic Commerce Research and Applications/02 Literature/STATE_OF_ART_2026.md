@@ -88,3 +88,25 @@ P3 will not claim that observational clickstream data automatically identifies c
 - product recommendations derived from those estimates
 
 This separation is central to both the scientific contribution and the credibility of Orbit's causal functions.
+
+## Novelty freeze (2026-09-18, post-experiment)
+
+Checked against the anchors above before freezing the contribution. Each individual component is
+established prior art: "beyond last touch" (Berman 2018), attribution→bidding/budget (Li et al.
+2016), observational-vs-experimental ad measurement (Gordon et al. 2019/2023), graph/removal-effect
+MTA (Management Science 2024), AIPW/DML/uplift as methods. **None of these is claimed as new.**
+
+The residual, defensible novelty is the **integrated, software-synchronised evidence chain**, not
+any single method:
+1. explicit historical-credit vs incremental-contribution contrast with quantified ranking inversion (E1);
+2. estimator recovery against **known** truth with correct-CI evidence and a documented misspecification failure region (E2);
+3. a randomized-validation pipeline (E3, fixture-validated here);
+4. a one-factor **failure-region map** over identification assumptions (E6);
+5. **matched-budget decision-value** quantification with regret vs an oracle (E5); and
+6. an evidence-gated **abstention** policy — all delivered from a running product system (Orbit)
+   with the AIPW estimator shared between product and research code.
+
+Framing rule for the manuscript: lead with the *chain and its decision/failure consequences*, not
+with the estimator or the journey graph. Magnitudes are semi-synthetic and not transportable; the
+mechanisms are. Real-data randomized/observational/external validation (Criteo/UCI) is pipeline-ready
+but not executed here (network policy) — see `03 Data/ACQUISITION_STATUS.md`.

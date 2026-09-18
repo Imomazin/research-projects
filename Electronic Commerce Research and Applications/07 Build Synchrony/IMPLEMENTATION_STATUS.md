@@ -49,3 +49,38 @@
 ## Evidence discipline
 
 These are causal computation primitives, not evidence that any historical Orbit campaign has a causal effect. Product-facing causal claims remain blocked until semi-synthetic and randomised-benchmark validation passes and identification assumptions are recorded.
+
+---
+
+## Final-stage update (2026-09-18, Orbit @ 559a262, research @ c022fba)
+
+### Now implemented (previously "not yet claimed")
+- **Nuisance-model training + cross-fitting**: real logistic/linear/GBM nuisances with K=5
+  StratifiedKFold out-of-fold prediction (`04 Experiments/p3lib/estimators.py`).
+- **Estimator suite in `causal-core`**: IPW (Hájek), outcome-regression, difference-in-means as
+  full `EffectEstimate`, alongside AIPW; binary-treatment guard; propensity-clip reporting.
+- **Backdoor identification engine** (`causal-core/identification.ts`): d-separation, refuses when
+  not identified, rejects post-treatment adjustment; parents-of-treatment adjustment helper.
+- **Diagnostics**: SMD balance (unadjusted + IPW-weighted), Kish ESS, extreme-weight fraction.
+- **CATE/uplift learner**: cross-fitted T-learner + PEHE/rank/decile/Qini/policy-value evaluation.
+- **Decision abstention**: evidence-quality and significance gates in `martech-core/uplift-recs.ts`.
+- **Semi-synthetic generator**: covariates exposed, known individual effects, prevalence/overlap/
+  nonlinearity/unmeasured-confounding/measurement-error/selection controls.
+- **Criteo E3 pipeline**: validated end-to-end on a schema-exact randomized fixture.
+- **32 unit tests** for the engine (`packages/causal-core/test/`), typecheck clean.
+
+### Still not implemented / intentionally out of scope (do not claim)
+- Channel-sequence causal discovery (assessed; adds noise, not used — researcher DAGs preferred).
+- Path-specific mediation estimation (kept conceptual; not identified in this data — not estimated).
+- General do-calculus (only backdoor identification is implemented).
+- DR-learner / causal-forest HTE comparison (single T-learner exercised at scale).
+
+### Blocked by environment network policy (not by method/compute)
+- Criteo Uplift (E3 canonical), Criteo Attribution (E4), UCI Online Retail (E7): dataset hosts
+  return 403 at the proxy. See `03 Data/ACQUISITION_STATUS.md`. Pipelines are ready; runs pending
+  a network that permits those hosts.
+
+### Evidence tier reached
+Semi-synthetic known-truth (E2/E6), observational-under-assumptions (E1) and matched-budget
+decision (E5) are CANONICAL and reproducible; randomized pipeline is FIXTURE-VALIDATED. See
+`PUBLICATION_READINESS_AUDIT.md`.
