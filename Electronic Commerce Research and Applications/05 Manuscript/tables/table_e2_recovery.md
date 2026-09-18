@@ -1,0 +1,22 @@
+| condition | estimator | truth | mean_bias | rmse | empirical_sd | mean_se | ci_coverage_95 | n_reps |
+|---|---|---|---|---|---|---|---|---|
+| linear_high_confounding | aipw | 1.0000 | 0.0058 | 0.0609 | 0.0609 | 0.0565 | 0.9200 | 100.0000 |
+| linear_high_confounding | difference-in-means | 1.0000 | 1.4720 | 1.4727 | 0.0463 | 0.0460 | 0.0000 | 100.0000 |
+| linear_high_confounding | ipw | 1.0000 | 0.0479 | 0.1036 | 0.0924 | 0.1208 | 0.9600 | 100.0000 |
+| linear_high_confounding | outcome-regression | 1.0000 | 0.0032 | 0.0440 | 0.0441 | 0.0111 | 0.4200 | 100.0000 |
+| linear_low_confounding | aipw | 1.0000 | 0.0032 | 0.0364 | 0.0364 | 0.0347 | 0.9400 | 100.0000 |
+| linear_low_confounding | difference-in-means | 1.0000 | 0.5799 | 0.5826 | 0.0557 | 0.0508 | 0.0000 | 100.0000 |
+| linear_low_confounding | ipw | 1.0000 | 0.0001 | 0.0367 | 0.0369 | 0.0556 | 1.0000 | 100.0000 |
+| linear_low_confounding | outcome-regression | 1.0000 | 0.0036 | 0.0367 | 0.0367 | 0.0112 | 0.4500 | 100.0000 |
+| linear_moderate_confounding | aipw | 1.0000 | 0.0043 | 0.0354 | 0.0353 | 0.0386 | 0.9800 | 100.0000 |
+| linear_moderate_confounding | difference-in-means | 1.0000 | 1.0068 | 1.0081 | 0.0507 | 0.0491 | 0.0000 | 100.0000 |
+| linear_moderate_confounding | ipw | 1.0000 | -0.0032 | 0.0473 | 0.0474 | 0.0706 | 1.0000 | 100.0000 |
+| linear_moderate_confounding | outcome-regression | 1.0000 | 0.0052 | 0.0356 | 0.0354 | 0.0111 | 0.4600 | 100.0000 |
+| nonlinear_gbm_learner | aipw | 1.0000 | 0.3518 | 0.3556 | 0.0525 | 0.0514 | 0.0000 | 40.0000 |
+| nonlinear_gbm_learner | difference-in-means | 1.0000 | 2.2505 | 2.2514 | 0.0646 | 0.0719 | 0.0000 | 40.0000 |
+| nonlinear_gbm_learner | ipw | 1.0000 | 0.6824 | 0.6855 | 0.0654 | 0.0943 | 0.0000 | 40.0000 |
+| nonlinear_gbm_learner | outcome-regression | 1.0000 | 0.5694 | 0.5707 | 0.0395 | 0.0200 | 0.0000 | 40.0000 |
+| nonlinear_linear_learner | aipw | 1.0000 | 1.8732 | 1.8747 | 0.0774 | 0.0815 | 0.0000 | 100.0000 |
+| nonlinear_linear_learner | difference-in-means | 1.0000 | 2.2402 | 2.2415 | 0.0762 | 0.0716 | 0.0000 | 100.0000 |
+| nonlinear_linear_learner | ipw | 1.0000 | 1.6668 | 1.6679 | 0.0608 | 0.0730 | 0.0000 | 100.0000 |
+| nonlinear_linear_learner | outcome-regression | 1.0000 | 1.7031 | 1.7041 | 0.0601 | 0.0174 | 0.0000 | 100.0000 |
