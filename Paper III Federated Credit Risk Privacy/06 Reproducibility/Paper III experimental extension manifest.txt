@@ -1,0 +1,36 @@
+Paper III experimental extension - reproducibility manifest
+
+Taiwan Credit Card Default dataset: default of credit card clients.xlsx
+  SHA256: b2dcb7219c1a4615ac01419160c83bbcffde31eccd710862dc5e714cb64be057
+  bytes: 3833896
+Archived Paper III results: Paper III All Results Combined (2).csv
+  SHA256: 77e4b2729d6331ee3d21e6732def6586a9267627967272737c89fb799a03e126
+  bytes: 1916365
+Experimental extension runner: Paper III experimental extension.py
+  SHA256: c743d3cf2bf81da6e2ede5e8e9dd57ad17d30d11dadd9d3bbfc8840d8828038d
+  bytes: 11939
+
+Python: 3.13.5
+numpy: 2.3.5
+pandas: 2.2.3
+scipy: 1.17.0
+scikit-learn: 1.8.0
+
+Core training configuration:
+  5 simulated clients; 80/20 stratified split; training-only standardisation
+  50 rounds; 8 local steps/client/round; Poisson target lot size 128
+  learning rate 1.0; L2 penalty 1e-4; size-weighted aggregation
+  D0 non-private; D0C clip-only; D1 sigma 0.8; D2 sigma 1.5; D3 sigma 2.5
+  D4 front-loaded using archived per-seed C2 schedule for severe extensions
+  100 archived manuscript seeds for full severe and clip experiments
+
+New severe extensions:
+  S1: C2 severe non-IID + 20% symmetric label noise; full participation
+  S2: C2 severe non-IID + 40% client participation; no added label noise
+
+Stricter clip sweep:
+  C1-C6; clip norms 1.00, 0.75, 0.50, 0.25
+  D0C and D2 to isolate clipping-only vs matched medium-DP behaviour
+
+Gradient diagnostic:
+  C1; archived 30 checkpoint-diagnostic seeds; D0, D3 and D4; 50 round traces
