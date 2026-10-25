@@ -428,6 +428,9 @@ CONCEPTS = [
     "ResearchAndDevelopmentExpense", "ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost",
     "PaymentsToAcquireBusinessesNetOfCashAcquired", "RestructuringCharges", "SellingGeneralAndAdministrativeExpense",
     "PaymentsForRepurchaseOfCommonStock", "PaymentsOfDividends", "PaymentsOfDividendsCommonStock",
+    "ProfitLoss", "NetIncomeLossAvailableToCommonStockholdersBasic", "PaymentsToAcquireProductiveAssets",
+    "InterestExpense", "IncomeTaxExpenseBenefit", "DepreciationDepletionAndAmortization", "OperatingExpenses",
+    "CostsAndExpenses", "AssetsCurrent", "LiabilitiesCurrent", "Goodwill",
 ]
 
 
