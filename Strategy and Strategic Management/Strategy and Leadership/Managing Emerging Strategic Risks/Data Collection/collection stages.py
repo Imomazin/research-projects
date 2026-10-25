@@ -662,7 +662,10 @@ def stage_prices(client, proj: Path, data: Path, log: list, **kw):
                 for line in r.text.splitlines()[1:]:
                     parts = [x.strip() for x in line.split("\t")]
                     if len(parts) >= 4 and parts[0] == sid and parts[2].startswith("M") and parts[2] != "M13" and int(parts[1]) >= 2012:
-                        rows.append({"year": int(parts[1]), "month": int(parts[2][1:]), "value": float(parts[3])})
+                        try:
+                            rows.append({"year": int(parts[1]), "month": int(parts[2][1:]), "value": float(parts[3])})
+                        except ValueError:
+                            attempts.append(f"BLS flat file: no value for {parts[1]} {parts[2]} ({parts[3]!r}, footnote {parts[4] if len(parts) > 4 else ''!r})")
                 source = flat[sid] if rows else ""
             except Exception as exc:
                 attempts.append(f"BLS flat error {type(exc).__name__}")
