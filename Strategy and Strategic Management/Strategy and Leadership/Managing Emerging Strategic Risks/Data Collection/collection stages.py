@@ -622,5 +622,42 @@ def stage_convergence(client, proj: Path, data: Path, log: list, **kw):
         raise RuntimeError(r.stderr[-3000:])
 
 
+BLS_SERIES = {"CUSR0000SA0": "Consumer Price Index All Urban Consumers Seasonally Adjusted BLS.csv",
+              "WPSFD4": "Producer Price Index Final Demand Seasonally Adjusted BLS.csv"}
+
+
+def stage_prices(client, proj: Path, data: Path, log: list, **kw):
+    """Price indices from the Bureau of Labor Statistics public API (FRED timed out from the runner)."""
+    import hashlib
+    import requests
+    out = proj / "Datasets" / "Raw Macro" / "Revision"
+    out.mkdir(parents=True, exist_ok=True)
+    man = []
+    for sid, name in BLS_SERIES.items():
+        rows = []
+        for a, b in ((2012, 2020), (2021, 2026)):
+            r = requests.post("https://api.bls.gov/publicAPI/v1/timeseries/data/",
+                              json={"seriesid": [sid], "startyear": str(a), "endyear": str(b)},
+                              headers={"User-Agent": "Imo Enang strategic risk research " + MAILTO}, timeout=90)
+            js = r.json()
+            log.append(f"BLS {sid} {a}-{b}: {js.get('status')} {js.get('message')}")
+            for d in js.get("Results", {}).get("series", [{}])[0].get("data", []):
+                if d["period"].startswith("M") and d["period"] != "M13":
+                    rows.append({"year": int(d["year"]), "month": int(d["period"][1:]), "value": float(d["value"])})
+            time.sleep(3)
+        rows.sort(key=lambda x: (x["year"], x["month"]))
+        with open(out / name, "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=["year", "month", "value"])
+            w.writeheader()
+            w.writerows(rows)
+        body = (out / name).read_bytes()
+        man.append({"file": name, "url": f"https://api.bls.gov/publicAPI/v1/timeseries/data/ series {sid}", "status": "downloaded" if rows else "failed",
+                    "bytes": len(body), "sha256": hashlib.sha256(body).hexdigest(), "retrieved": now(), "rows": len(rows)})
+    with open(out / "Price Index Retrieval Manifest.csv", "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(man[0].keys()))
+        w.writeheader()
+        w.writerows(man)
+
+
 STAGES = {"literature": stage_literature, "frame": stage_frame, "macro": stage_macro,
-          "filings": stage_filings, "facts": stage_facts, "revision": stage_revision, "nli": stage_nli, "convergence": stage_convergence}
+          "filings": stage_filings, "facts": stage_facts, "revision": stage_revision, "nli": stage_nli, "convergence": stage_convergence, "prices": stage_prices}
