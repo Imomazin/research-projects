@@ -170,6 +170,7 @@ def main():
     status = "completed"
     spec2 = importlib.util.spec_from_file_location("stages", HERE / "collection stages.py")
     stages = importlib.util.module_from_spec(spec2)
+    sys.modules["stages"] = stages
     spec2.loader.exec_module(stages)
     registry = {**stages.STAGES, "probe": stage_probe}
     for name in stage.split(","):
