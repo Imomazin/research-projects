@@ -166,26 +166,32 @@ def main():
     args = dict(re.findall(r"(\w+):\s*(\S+)", request))
     prepare_data_branch()
     client = edgar.Client(CACHE)
-    log: list[str] = [f"stage {stage} started {now()}", f"request: {request.strip()}"]
+    log: list[str] = [f"stages {stage} started {now()}", f"request: {request.strip()}"]
     status = "completed"
-    try:
-        mod_stage = STAGES.get(stage)
-        if mod_stage is None:
-            spec2 = importlib.util.spec_from_file_location("stages", HERE / "collection stages.py")
-            stages = importlib.util.module_from_spec(spec2)
-            spec2.loader.exec_module(stages)
-            mod_stage = stages.STAGES[stage]
-        mod_stage(client, PROJ, DATA_DIR, log, **{k: v for k, v in args.items() if k != "stage"})
-    except Exception:
-        status = "failed"
-        log.append(traceback.format_exc())
+    spec2 = importlib.util.spec_from_file_location("stages", HERE / "collection stages.py")
+    stages = importlib.util.module_from_spec(spec2)
+    spec2.loader.exec_module(stages)
+    registry = {**stages.STAGES, "probe": stage_probe}
+    for name in stage.split(","):
+        try:
+            log.append(f"--- {name} {now()}")
+            registry[name](client, PROJ, DATA_DIR, log, **{k: v for k, v in args.items() if k != "stage"})
+        except Exception:
+            status = "failed"
+            log.append(f"stage {name} failed")
+            log.append(traceback.format_exc())
     log.extend(client.log[-400:])
     log.append(f"stage {stage} {status} {now()}")
     logdir = HERE / "Run Logs"
     logdir.mkdir(exist_ok=True)
-    (logdir / f"{stage.title()} Log.txt").write_text("\n".join(log))
+    (logdir / f"{stage.replace(',', ' ').title()} Log.txt").write_text("\n".join(log))
     (logdir / "Latest Status.txt").write_text(f"{stage} {status} {now()}\n")
-    push(DATA_DIR, DATA_BRANCH, f"Pipeline stage {stage} {status}")
+    try:
+        push(DATA_DIR, DATA_BRANCH, f"Pipeline stage {stage} {status}")
+    except Exception:
+        status = "failed"
+        (logdir / "Data Push Error.txt").write_text(traceback.format_exc())
+        (logdir / "Latest Status.txt").write_text(f"{stage} {status} data push {now()}\n")
     git("config", "user.name", "strategic-risk-pipeline")
     git("config", "user.email", "actions@users.noreply.github.com")
     push(REPO, "research/strategic-risk", f"Pipeline stage {stage} {status}")
