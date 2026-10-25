@@ -308,6 +308,12 @@ VAR = {"Original rules": "cov_original", "Revised rules": "cov_revised", "High-c
 rv = []
 for lab, d, outs in (("A", A, ["severity", "margin_change", "recovery"]), ("B", B, B_OUT)):
     for vname, v in VAR.items():
+        nonzero = int((d[v] > 0).sum())
+        if nonzero < 10:   # too few firms with any response for a slope to be estimated
+            rv.append({"episode": lab, "outcome": "all", "measure": vname, "model": "not estimated", "term": "",
+                       "n": int(d[v].notna().sum()), "share_zero": float((d[v] == 0).mean()), "mean": float(d[v].mean()),
+                       "note": f"only {nonzero} firms with a non-zero value"})
+            continue
         d["cv_z"] = d[v + "_z"]
         d["bxcv"] = d["breadth_z"] * d["cv_z"]
         for y in outs:
@@ -526,7 +532,9 @@ MEAS = {"Breadth, threshold three (primary)": "breadth_z", "Breadth, threshold o
 for lab, d, outs in (("A", A, ["severity", "margin_change", "recovery"]), ("B", B, B_OUT)):
     for name, v in MEAS.items():
         for y in outs:
-            r, _ = fit(d, y, [v] + BASE, [v])
+            # mention density is the sum of the nine intensities, so the intensities are dropped for that measure
+            rhs = [v] + (CONTROLS if v == "mention_density_z" else BASE)
+            r, _ = fit(d, y, rhs, [v])
             alt.append({"episode": lab, "outcome": y, "measure": name, **r[0]})
     # breadth and explicit interaction together
     for y in outs:
@@ -595,8 +603,11 @@ bls = RAWREV / "Consumer Price Index All Urban Consumers Seasonally Adjusted BLS
 if bls.exists() and len(pd.read_csv(bls)) > 100:
     cpi = pd.read_csv(bls)
     cpi["month"] = pd.PeriodIndex.from_fields(year=cpi["year"], month=cpi["month"], freq="M")
-    cpi = cpi.rename(columns={"value": "cpi"})
-    OUT["cpi_source"] = "BLS CUSR0000SA0"
+    cpi = cpi.rename(columns={"value": "cpi"}).set_index("month").reindex(pd.period_range(cpi["month"].min(), cpi["month"].max(), freq="M"))
+    OUT["cpi_months_interpolated"] = [str(m) for m in cpi.index[cpi["cpi"].isna()]]
+    cpi["cpi"] = cpi["cpi"].interpolate()   # October 2025 was not published (BLS footnote X); linear between September and November
+    cpi = cpi.rename_axis("month").reset_index()
+    OUT["cpi_source"] = "BLS CUSR0000SA0 (download.bls.gov flat file)"
 else:
     cpi = pd.DataFrame({"month": pd.period_range("2010-01", "2026-12", freq="M"), "cpi": np.nan})
     OUT["cpi_source"] = "not available"

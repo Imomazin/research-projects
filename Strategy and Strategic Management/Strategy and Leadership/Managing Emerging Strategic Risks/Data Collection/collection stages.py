@@ -714,6 +714,9 @@ def stage_references(client, proj: Path, data: Path, log: list, **kw):
                               sec=False, use_cache=False)
             rec["search"] = json.loads(body)["message"]["items"] if body else []
             time.sleep(1.0)
+            oa = client.get("https://api.openalex.org/works?per-page=5&mailto=" + MAILTO + "&search=" + quote(r["title_query"]),
+                            sec=False, use_cache=False)
+            rec["openalex_search"] = json.loads(oa).get("results", []) if oa else []
         recs[r["key"]] = rec
     (lit / "Crossref Records" / "Revision Candidate Records.json").write_text(json.dumps(recs, indent=1))
     log.append(f"candidate records {len(recs)}; doi hits {sum(1 for v in recs.values() if v.get('message'))}")
