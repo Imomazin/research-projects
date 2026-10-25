@@ -87,21 +87,54 @@ def audit_summary(path: Path) -> pd.DataFrame:
     return a.assign(dictionary_label=lab).groupby("dictionary_label")["audit_label"].agg(["mean", "sum", "count"]).round({"mean": 3})
 
 
-def pipeline(root: Path, data: Path) -> list:
+def pipeline(root: Path, data: Path, resume: bool = False) -> list:
+    """Run the first-version pipeline. With resume, steps whose outputs already exist in the work
+    folder from an interrupted run are recorded as reused instead of being run again."""
     log: list = []
     der = root / "Datasets" / "Derived"
     texts, facts = data / "Filing Texts", data / "Company Facts" / "Financial Facts Long.csv.gz"
-    run(root, "Data Collection/draw sample.py", log=log)
-    run(root, "Analysis/build financial panel.py", facts, der / "Financial Panel.csv", log=log)
-    run(root, "Analysis/build text measures.py", texts, der, log=log)
-    tmp = root / "Original Dictionary Run"
-    tmp.mkdir()
-    run(root, "Analysis/build text measures.py", texts, tmp, env={"RISK_DICTIONARY": "Risk Taxonomy Dictionary Original.json"}, log=log)
-    shutil.move(tmp / "Text Measures.csv", der / "Text Measures Original Dictionary.csv")
-    shutil.move(tmp / "Validation Sample.csv", der / "Validation Sample Original Dictionary.csv")
-    hold = root / "Holdout Sample Run"
-    hold.mkdir()
-    run(root, "Analysis/build text measures.py", texts, hold, env={"VALIDATION_SEED": "20261025"}, log=log)
+
+    def done(step, *outs):
+        if resume and all(o.exists() for o in outs):
+            log.append({"script": step, "args": "", "env": "", "returncode": 0, "seconds": 0,
+                        "stderr_tail": "reused output of the interrupted run in the same work folder"})
+            return True
+        return False
+
+    if not done("Data Collection/draw sample.py", root / "Datasets" / "Sampling Frame" / "Sample Firms.csv"):
+        run(root, "Data Collection/draw sample.py", log=log)
+    # At ed1a1df no script writes the final row of the sample selection log (the validation screen
+    # that leaves 787 firms); it was added to the committed log by hand. The reproduction derives it
+    # from the committed Frame Validation Exclusions.csv and records this in the run log.
+    sel = root / "Datasets" / "Sampling Frame" / "Sample Selection Log.csv"
+    sl = pd.read_csv(sel)
+    if len(sl) == 9:
+        firms = pd.read_csv(root / "Datasets" / "Sampling Frame" / "Sample Firms.csv")
+        exc = pd.read_csv(root / "Datasets" / "Sampling Frame" / "Frame Validation Exclusions.csv")
+        n = int(len(set(firms["cik"]) - set(exc["cik"])))
+        sl.loc[len(sl)] = ["Validation screen: implausible public float tags, non-US-dollar reporters and blank-check "
+                           "companies (see Frame Validation Exclusions.csv)", n]
+        sl.to_csv(sel, index=False)
+        log.append({"script": "reproduce study.py (selection log)", "args": "", "env": "", "returncode": 0, "seconds": 0,
+                    "stderr_tail": f"final selection-log row derived from Frame Validation Exclusions.csv: {n} firms; no script wrote it at ed1a1df"})
+    if not done("Analysis/build financial panel.py", der / "Financial Panel.csv"):
+        run(root, "Analysis/build financial panel.py", facts, der / "Financial Panel.csv", log=log)
+    if not done("Analysis/build text measures.py", der / "Text Measures.csv", der / "Category Pairs.csv"):
+        run(root, "Analysis/build text measures.py", texts, der, log=log)
+    if not done("Analysis/build text measures.py (original dictionary)", der / "Text Measures Original Dictionary.csv"):
+        tmp = root / "Original Dictionary Run"
+        tmp.mkdir(exist_ok=True)
+        run(root, "Analysis/build text measures.py", texts, tmp, env={"RISK_DICTIONARY": "Risk Taxonomy Dictionary Original.json"}, log=log)
+        shutil.move(tmp / "Text Measures.csv", der / "Text Measures Original Dictionary.csv")
+        shutil.move(tmp / "Validation Sample.csv", der / "Validation Sample Original Dictionary.csv")
+    if resume:
+        # the holdout draw only re-creates the audit sample, whose coded file is kept from the commit
+        log.append({"script": "Analysis/build text measures.py (holdout seed)", "args": "", "env": "", "returncode": 0, "seconds": 0,
+                    "stderr_tail": "not rerun on resume: its output is not used by later steps or compared"})
+    else:
+        hold = root / "Holdout Sample Run"
+        hold.mkdir()
+        run(root, "Analysis/build text measures.py", texts, hold, env={"VALIDATION_SEED": "20261025"}, log=log)
     run(root, "Analysis/build updating measure.py", texts, der / "Updating Measure.csv", log=log)
     run(root, "Analysis/build macro series.py", log=log)
     run(root, "Analysis/assemble panel.py", log=log)
@@ -133,7 +166,8 @@ def compare_frames(a: pd.DataFrame, b: pd.DataFrame) -> dict:
             return out
         diff = max(diff, float(np.nanmax(np.abs(x - y))) if x.notna().any() else 0.0)
     other = [c for c in a.columns if c not in num]
-    same_text = all((a[c].astype(str).values == b[c].astype(str).values).all() for c in other)
+    # compare text with missing values made equal (under pandas 3 astype(str) keeps NaN, and NaN != NaN)
+    same_text = all((a[c].fillna("").astype(str).values == b[c].fillna("").astype(str).values).all() for c in other)
     out.update(identical=bool(diff < 1e-9 and same_text), max_abs_diff=diff,
                note="" if same_text else "text columns differ")
     return out
@@ -161,11 +195,12 @@ def main():
     ap.add_argument("--data", required=True, type=Path)
     ap.add_argument("--work", required=True, type=Path)
     ap.add_argument("--skip-run", action="store_true")
+    ap.add_argument("--resume", action="store_true", help="continue an interrupted run in the same work folder")
     a = ap.parse_args()
     root = a.work / REL
     if not a.skip_run:
-        root = export_commit(a.work)
-        log = pipeline(root, a.data)
+        root = root if a.resume else export_commit(a.work)
+        log = pipeline(root, a.data, resume=a.resume)
         pd.DataFrame(log).to_csv(HERE / "Reproduction Run Log.csv", index=False)
 
     # ---------------- file-level comparison against the committed outputs at the same commit
@@ -196,12 +231,31 @@ def main():
         nd = [k for k in fo if k not in fr or (isinstance(fo[k], (int, float)) and isinstance(fr.get(k), (int, float))
                                               and not (np.isnan(fo[k]) and np.isnan(fr[k])) and abs(fo[k] - fr[k]) > 1e-9)
               or (not isinstance(fo[k], (int, float)) and fo[k] != fr.get(k))]
+        extra = [k for k in fr if k not in fo]
         files.append({"file": rel, "rows_original": len(fo), "rows_reproduced": len(fr), "identical": not nd and len(fo) == len(fr),
-                      "note": f"{len(nd)} leaves differ" + (": " + "; ".join(nd[:5]) if nd else "")})
+                      "note": f"{len(nd)} committed leaves differ" + (": " + "; ".join(nd[:5]) if nd else "") +
+                              (f"; {len(extra)} additional leaves in the reproduction, e.g. {', '.join(extra[:3])}" if extra else "")})
     bo = json.loads((croot / "Manuscript/Manuscript Blocks.json").read_text())
     br = json.loads((root / "Manuscript/Manuscript Blocks.json").read_text())
     files.append({"file": "Manuscript/Manuscript Blocks.json", "identical": bo == br,
                   "note": "manuscript text and tables rebuilt from reproduced numbers" + ("" if bo == br else ": text differs")})
+    why = {
+        "Datasets/Derived/Validation Sample Original Dictionary.csv":
+            ("Same 520 sentences; the committed file has an id column added when the sample was coded for the audit", "None needed"),
+        "Datasets/Derived/Validation Sample.csv":
+            ("Uncoded sample from the main text run; the committed draw shares 4 of 520 sentences with the reproduction, probably because it was written before the "
+             "final dictionary edit changed which sentences consume random draws. No reported number uses this file: the revised-dictionary audit uses the committed "
+             "Validation Holdout Revised Dictionary.csv", "Reproduced file kept in the work folder; committed file left unchanged"),
+        "Datasets/Sampling Frame/Sample Selection Log.csv":
+            ("Same counts. The first-row label in the committed log omits '(from frame stage log)' and the final row (787 firms) was added by hand; no script wrote it at ed1a1df",
+             "The reproduction derives the final row from Frame Validation Exclusions.csv"),
+        "Results/Alternative Original Dictionary/Model Results.json":
+            ("All committed entries identical; the reproduction also writes marginal effects for the original-dictionary run, which the committed file lacks", "None needed"),
+        "Manuscript/Manuscript Blocks.json":
+            ("Differences are limited to the first selection-log label in Table 2 and absolute figure paths", "None needed"),
+    }
+    for f in files:
+        f["explanation"], f["correction"] = why.get(f["file"], ("", ""))
     pd.DataFrame(files).to_csv(HERE / "File Comparison.csv", index=False)
 
     # ---------------- value-level reconciliation of every number quoted in the manuscript

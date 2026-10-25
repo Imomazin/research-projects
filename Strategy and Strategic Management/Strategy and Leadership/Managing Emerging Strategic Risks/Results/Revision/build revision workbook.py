@@ -242,6 +242,13 @@ for sname, blocks in S.items():
         row += len(df) + 3
     for j, w in widths.items():
         ws.column_dimensions[get_column_letter(j)].width = w
-    ws.freeze_panes = "A2"
+    if sname == "Read Me":
+        ws.column_dimensions["A"].width, ws.column_dimensions["B"].width = 34, 120
+    if sname == "Corrections Register":
+        for col, w in zip("ABCDE", (30, 45, 60, 50, 45)):
+            ws.column_dimensions[col].width = w
+        for r in ws.iter_rows(min_row=3):
+            for c in r:
+                c.alignment = Alignment(wrap_text=True, vertical="top")
 wb.save(OUT)
 print("written", OUT, [ws.title for ws in wb.worksheets])

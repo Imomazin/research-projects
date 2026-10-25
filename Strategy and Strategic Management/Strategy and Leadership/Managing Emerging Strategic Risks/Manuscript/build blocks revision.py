@@ -69,6 +69,17 @@ for k, e in cited.items():
         uniq[k] = e
         seen.add(e["doi"])
 cited = uniq
+# where a working paper and its journal version share an in-text form, keep the journal version
+bycite = {}
+for k, e in cited.items():
+    bycite.setdefault(e["cite"], []).append(k)
+for c, ks in bycite.items():
+    if len(ks) > 1:
+        journal = [k for k in ks if "Vol." in cited[k]["text"]]
+        if len(journal) == 1:
+            for k in ks:
+                if k != journal[0]:
+                    cited.pop(k)
 tokens = set()
 for grp in re.findall(r"\(([^()]*\d{4}[^()]*)\)", text_all):
     for part in grp.split(";"):
@@ -78,7 +89,7 @@ for grp in re.findall(r"\(([^()]*\d{4}[^()]*)\)", text_all):
 for m in re.finditer(r"([A-Z][A-Za-z'\-]+(?: et al\.| and [A-Z][A-Za-z'\-]+)?) \((\d{4})\)", text_all):
     tokens.add(f"{m.group(1)}, {m.group(2)}")
 known = {e["cite"] for e in cited.values()}
-missing = sorted(t for t in tokens if t not in known and not t.startswith(("Table", "Figure")))
+missing = sorted(t for t in tokens if not any(k == t or k.endswith(" " + t) for k in known) and not t.startswith(("Table", "Figure")))
 if missing:
     raise SystemExit(f"Citations without verified reference: {missing}")
 # two works with the same in-text form would need a and b suffixes
@@ -152,8 +163,8 @@ vs = N["validation_sample"]
 T["three"] = {
     "caption": "Table 3. Validation of four documented-response measures against the coding manual",
     "header": ["Rule", "Flagged in sample", "Of which qualify", "Precision, sample [Wilson 95%]", "Precision, weighted [95%]",
-               "Recall, weighted [95%]", "F1, weighted [95%]", "Pairs flagged in population"],
-    "widths": [22, 9, 9, 13, 13, 13, 12, 9], "rows": vrows,
+               "Recall, weighted [95%]", "F1, weighted [95%]", "Population pairs flagged"],
+    "widths": [18, 10, 9, 13, 13, 13, 12, 12], "rows": vrows,
     "note": f"Note: {vs['items']} sentence-category pairs drawn by stratified random sampling across rule strata, nine categories, "
             f"{vs['divisions']} SIC divisions and {vs['years']} fiscal years; {vs['qualifying']} qualify. Weighted figures apply design weights and "
             "give population estimates; intervals for weighted figures come from 2,000 stratified bootstrap draws. Recall is estimated within candidate pairs. "
@@ -239,7 +250,7 @@ def star(p):
 
 rows6 = []
 for t, lab in terms6:
-    rows6.append([lab] + [f"{f3(SH(y, t, **kw)['coef'])}{star(SH(y, t, **kw)['p'])}" for y, kw, _ in specs6])
+    rows6.append([lab] + [f"{SH(y, t, **kw)['coef']:.4f}{star(SH(y, t, **kw)['p'])}" for y, kw, _ in specs6])
 rows6.append(["Firm-years"] + [f"{int(SH(y, 'x_geopolitical', **kw)['n']):,}" for y, kw, _ in specs6])
 T["six"] = {
     "caption": "Table 6. Pre-shock exposure and realised sensitivity by channel, fiscal 2019 to 2025",
@@ -286,7 +297,7 @@ T["eight"] = {
         ["Identify", f"Risk lists rose to {f2(O['breadth_mean']['2025'])} of nine categories; dispersion fell under every count and more than half of Item 1A text sat in boilerplate sentences from fiscal 2019",
          "Which of our risk statements would read the same for a competitor?", "Item 1A changes against last year; firm-specific risks separated from shared text", "General counsel and chief risk officer; annual"],
         ["Quantify", "Geopolitical and supply-chain exposure moved revenue and cost together; macro-financial exposure reduced operating margin; combined exposure added nothing measurable",
-         "Through which channel would each risk reach the accounts, and how much?", "Revenue, cost and asset share exposed per channel; contractual ability to pass costs into prices", "Chief financial officer; annual and after each shock"],
+         "Through which channel would each risk reach the accounts and how much?", "Revenue, cost and asset share exposed per channel; contractual ability to pass costs into prices", "Chief financial officer; annual and after each shock"],
         ["Respond", f"Rules counting response had precision near {f2(N['validation']['Revised rules|All reference items']['precision_weighted'])}; threat-linked responses were rare and none protected performance",
          "What have we completed for each material risk, with what resources?", "Register of completed actions tied to a named threat, with cost, owner and date", "Executive owner for each risk; quarterly"],
         ["Validate", "Disclosure did not predict who lost most; realised sensitivity by channel did",

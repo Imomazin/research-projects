@@ -80,13 +80,13 @@ if lmf.exists():
 anyresp = {}
 for k, cols in {"original": [f"act_original_{c}" for c in CATS], "revised": [f"act_revised_{c}" for c in CATS],
                 "high": [f"act_high_{c}" for c in CATS]}.items():
-    anyresp[k] = {int(y): round(100 * float((g[cols].sum(1) > 0).mean()), 1) for y, g in P.groupby("fiscal_year")}
+    anyresp[k] = {int(y): round(100 * float((g[cols].sum(axis=1) > 0).mean()), 1) for y, g in P.groupby("fiscal_year")}
 if "lm_pairs" in P:
     anyresp["lm"] = {int(y): round(100 * float((g["lm_pairs"] > 0).mean()), 1) for y, g in P.groupby("fiscal_year")}
 N["any_response_pct"] = anyresp
 N["high_pairs_total"] = int(P[[f"act_high_{c}" for c in CATS]].sum().sum())
 N["high_pairs_by_category"] = {c: int(P[f"act_high_{c}"].sum()) for c in CATS}
-N["high_firms_fy2018"] = int((P[P["fiscal_year"] == 2018][[f"act_high_{c}" for c in CATS]].sum(1) > 0).sum())
+N["high_firms_fy2018"] = int((P[P["fiscal_year"] == 2018][[f"act_high_{c}" for c in CATS]].sum(axis=1) > 0).sum())
 
 # recovery and interaction investigations, robustness grid for breadth alone, added checks
 N["recovery_investigation"] = rec(pd.read_csv(REV / "Recovery Investigation.csv"))
