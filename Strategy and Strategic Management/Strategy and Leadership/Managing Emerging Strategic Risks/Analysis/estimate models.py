@@ -69,31 +69,32 @@ def episode_frame(pre_text_year: int, base_year: int, label: str, threshold: int
         + [f"cnt_{c}" for c in CATS] + [f"act_{c}" for c in CATS]
     for k in keep:
         d[k] = t[k]
-    for k in ["ln_assets", "leverage", "cash_ratio", "roa", "sic2", "division", "fye_month", "us_incorporated",
-              "op_margin", "reconfiguration", "foreign_share", "sampling_weight"]:
-        d[k] = b[k]
-    rb, rb2 = wide("ln_revenue", base_year), wide("ln_revenue", base_year - 2)
-    d["prior_growth"] = (rb - rb2.reindex(rb.index)) / 2
+    for k in ["sic2", "division", "us_incorporated", "sampling_weight", "fye_month"]:
+        d[k] = t[k]
+    for k in ["ln_assets", "leverage", "cash_ratio", "roa", "op_margin", "reconfiguration", "foreign_share"]:
+        d[k] = b[k].reindex(d.index)
+    rb, rb2 = wide("ln_revenue", base_year).reindex(d.index), wide("ln_revenue", base_year - 2).reindex(d.index)
+    d["prior_growth"] = (rb - rb2) / 2
     d["label"] = label
     return d
 
 
 def add_outcomes_a(d):
-    r19, r20, r21, r22 = (wide("ln_revenue", y) for y in (2019, 2020, 2021, 2022))
-    m19, m20 = wide("op_margin", 2019), wide("op_margin", 2020)
-    d["severity"] = (r20 - r19).reindex(d.index)
-    d["margin_change"] = (m20 - m19).reindex(d.index)
-    d["recovery"] = (r22 - r19).reindex(d.index)
-    d["recovered"] = (r21 >= r19).astype(float).where(r21.notna() & r19.notna()).reindex(d.index)
+    r19, r20, r21, r22 = (wide("ln_revenue", y).reindex(d.index) for y in (2019, 2020, 2021, 2022))
+    m19, m20 = (wide("op_margin", y).reindex(d.index) for y in (2019, 2020))
+    d["severity"] = r20 - r19
+    d["margin_change"] = m20 - m19
+    d["recovery"] = r22 - r19
+    d["recovered"] = (r21 >= r19).astype(float).where(r21.notna() & r19.notna())
     return d
 
 
 def add_outcomes_b(d):
-    r21, r23 = wide("ln_revenue", 2021), wide("ln_revenue", 2023)
-    m21, m22, m23 = (wide("op_margin", y) for y in (2021, 2022, 2023))
-    d["margin_change"] = (m22 - m21).reindex(d.index)
-    d["margin_change_two"] = (m23 - m21).reindex(d.index)
-    d["severity"] = (r23 - r21).reindex(d.index)
+    r21, r23 = (wide("ln_revenue", y).reindex(d.index) for y in (2021, 2023))
+    m21, m22, m23 = (wide("op_margin", y).reindex(d.index) for y in (2021, 2022, 2023))
+    d["margin_change"] = m22 - m21
+    d["margin_change_two"] = m23 - m21
+    d["severity"] = r23 - r21
     return d
 
 
@@ -118,7 +119,7 @@ def ols(d, y, rhs, label, weights=None):
     cols = [y] + [c for c in rhs if ":" not in c] + ["sic2", "fye_month"]
     dd = d.dropna(subset=[c for c in cols if c in d.columns])
     res = smf.ols(f, data=dd).fit(cov_type="cluster", cov_kwds={"groups": dd["sic2"]})
-    hc3 = smf.ols(f, data=dd).fit(cov_type="HC3")
+    hc3 = smf.ols(f, data=dd).fit(cov_type="HC1")
     return res, hc3, dd
 
 
@@ -136,7 +137,7 @@ def episode_models(d, outcomes, label):
             res, hc3, dd = ols(d, y, rhs, f"{label} {h} {y}")
             key = f"{label}|{h}|{y}"
             terms = [t for t in ["breadth_z", "coverage_z", "breadth_z:coverage_z", "linkage_z"] if t in rhs]
-            rows += tidy(res, terms, key)
+            rows += [{**r, "p_hc1": float(hc3.pvalues[r["term"]])} for r in tidy(res, terms, key)]
             meta[key] = {"n": int(res.nobs), "r2": res.rsquared, "adj_r2": res.rsquared_adj,
                          "hc3_p": {t: float(hc3.pvalues[t]) for t in terms},
                          "clusters": int(dd["sic2"].nunique())}
@@ -172,61 +173,71 @@ corrA = A[corr_cols].corr()
 corrA.to_csv(RES / "Correlations Episode A.csv")
 OUT["correlations_A"] = corrA.round(4).to_dict()
 
-# ------------------------------------------------------------------ robustness, episode A severity and margin
+# ------------------------------------------------------------------ robustness grid
 ROB = []
+EPI = {"A": (2018, 2019, add_outcomes_a, A_OUT, A), "B": (2020, 2021, add_outcomes_b, B_OUT, B)}
 
 
-def rob(label, d, y="severity", term="breadth_z", rhs_extra=None, rhs=None):
+def rob(ep, label, d, y, rhs_extra=None, rhs=None):
     rhs = rhs or (["breadth_z", "coverage_z", "breadth_z:coverage_z"] + INTS + CONTROLS)
     if rhs_extra:
         rhs = rhs + rhs_extra
-    res, hc3, dd = ols(d, y, rhs, label)
-    for t in ["breadth_z", "coverage_z", "breadth_z:coverage_z", "diversity_z", "breadth_c_z"]:
+    res, hc1, dd = ols(d, y, rhs, label)
+    for t in ["breadth_z", "coverage_z", "breadth_z:coverage_z"]:
         if t in res.params.index:
-            ROB.append({"check": label, "outcome": y, "term": t, "coef": res.params[t], "se": res.bse[t],
-                        "p": res.pvalues[t], "n": int(res.nobs)})
+            ROB.append({"episode": ep, "check": label, "outcome": y, "term": t, "coef": res.params[t],
+                        "se": res.bse[t], "p": res.pvalues[t], "p_hc1": hc1.pvalues[t], "n": int(res.nobs)})
 
 
-def rebuild_threshold(th):
-    d = episode_frame(2018, 2019, "A")
-    cnt = d[[f"cnt_{c}" for c in CATS]].to_numpy()
-    act = d[[f"act_{c}" for c in CATS]].to_numpy()
-    mat = cnt >= th
-    d["breadth"] = mat.sum(axis=1)
-    d["coverage"] = np.where(mat.sum(axis=1) > 0, (mat & (act > 0)).sum(axis=1) / np.maximum(mat.sum(axis=1), 1), np.nan)
-    return prepare(add_outcomes_a(d), A_OUT)
+def rebuild(ep, th=None, text_year=None, extra_filter=None):
+    ty, by, add, outs, _ = EPI[ep]
+    d = episode_frame(text_year or ty, by, ep, extra_filter=extra_filter)
+    if th is not None:
+        cnt = d[[f"cnt_{c}" for c in CATS]].to_numpy()
+        act = d[[f"act_{c}" for c in CATS]].to_numpy()
+        mat = cnt >= th
+        d["breadth"] = mat.sum(axis=1)
+        d["coverage"] = np.where(mat.sum(axis=1) > 0, (mat & (act > 0)).sum(axis=1) / np.maximum(mat.sum(axis=1), 1), np.nan)
+    return prepare(add(d), outs)
 
 
-for y in ["severity", "margin_change"]:
-    rob("Primary specification", A, y)
-    rob("Materiality threshold one sentence", rebuild_threshold(1), y)
-    rob("Materiality threshold five sentences", rebuild_threshold(5), y)
-    dv = A.copy()
-    dv["breadth_z"] = dv["diversity_z"]
-    rob("Diversity in place of breadth", dv, y)
-    rob("Without category intensity controls", A, y,
-        rhs=["breadth_z", "coverage_z", "breadth_z:coverage_z"] + CONTROLS)
-    rob("December fiscal year-end only", A[A["fye_month"] == "12"], y)
-    rob("Item 1A of at least 1,000 words", A[A["ln_item1a_words"] >= np.log1p(1000)], y)
-    rob("US-incorporated firms only", A[A["us_incorporated"] == 1], y)
-    rob("Excluding manufacturing", A[A["division"] != "Manufacturing"], y)
-    rob("Manufacturing only", A[A["division"] == "Manufacturing"], y)
-    rob("Reconfiguration control", A, y, rhs_extra=["reconfiguration"])
-    rob("Foreign income share control", A, y, rhs_extra=["foreign_share"])
-    # FY2019 predictors filed before 1 March 2020
-    d19 = episode_frame(2019, 2019, "A19", extra_filter=lambda t: t["filing_date"] < "2020-03-01")
-    rob("FY2019 text filed before 1 March 2020", prepare(add_outcomes_a(d19), A_OUT), y)
-    # unwinsorised outcome
-    raw = add_outcomes_a(episode_frame(2018, 2019, "A"))
-    du = A.copy()
-    du[y] = raw[y]
-    rob("Unwinsorised outcome", du, y)
-    for div in sorted(A["division"].dropna().unique()):
-        sub = A[A["division"] != div]
-        if len(sub) > 300:
-            rob(f"Dropping {div}", sub, y)
+GRID = {"A": ["severity", "margin_change", "recovery"], "B": ["margin_change", "margin_change_two", "severity"]}
+for ep, outs in GRID.items():
+    ty, by, add, allouts, D = EPI[ep]
+    base_rev = wide("revenue", by)
+    for y in outs:
+        rob(ep, "Primary specification", D, y)
+        rob(ep, "Materiality threshold one sentence", rebuild(ep, 1), y)
+        rob(ep, "Materiality threshold five sentences", rebuild(ep, 5), y)
+        dv = D.copy()
+        dv["breadth_z"] = dv["diversity_z"]
+        rob(ep, "Diversity in place of breadth", dv, y)
+        rob(ep, "Without category intensity controls", D, y, rhs=["breadth_z", "coverage_z", "breadth_z:coverage_z"] + CONTROLS)
+        rob(ep, "December fiscal year-end only", D[D["fye_month"] == "12"], y)
+        rob(ep, "Item 1A of at least 1,000 words", D[D["ln_item1a_words"] >= np.log1p(1000)], y)
+        rob(ep, "US-incorporated firms only", D[D["us_incorporated"] == 1], y)
+        rob(ep, "Base-year revenue of at least 100 million US dollars", D[base_rev.reindex(D.index) >= 1e8], y)
+        rob(ep, "Manufacturing only", D[D["division"] == "Manufacturing"], y)
+        rob(ep, "Excluding manufacturing", D[D["division"] != "Manufacturing"], y)
+        rob(ep, "Reconfiguration control", D, y, rhs_extra=["reconfiguration"])
+        rob(ep, "Foreign income share control", D, y, rhs_extra=["foreign_share"])
+        rob(ep, "Updating control", D.assign(updating_z=z(D["updating"])), y, rhs_extra=["updating_z"])
+        if ep == "A":
+            rob(ep, "FY2019 text filed before 1 March 2020",
+                rebuild("A", text_year=2019, extra_filter=lambda t: t["filing_date"] < "2020-03-01"), y)
+        else:
+            rob(ep, "FY2021 text filed before 24 February 2022",
+                rebuild("B", text_year=2021, extra_filter=lambda t: t["filing_date"] < "2022-02-24"), y)
+        raw = add(episode_frame(ty, by, ep))
+        du = D.copy()
+        du[y] = raw[y]
+        rob(ep, "Unwinsorised outcome", du, y)
+        for div in sorted(D["division"].dropna().unique()):
+            sub = D[D["division"] != div]
+            if len(D) - len(sub) >= 10:
+                rob(ep, f"Dropping {div}", sub, y)
 robust = pd.DataFrame(ROB)
-robust.to_csv(RES / "Robustness Episode A.csv", index=False)
+robust.to_csv(RES / "Robustness Grid.csv", index=False)
 OUT["robustness"] = robust.to_dict(orient="records")
 
 # ------------------------------------------------------------------ panel models

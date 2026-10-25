@@ -8,6 +8,8 @@ Output: Datasets/Derived/Research Panel.csv and Variable Coverage.csv.
 from __future__ import annotations
 
 import json
+import warnings
+warnings.filterwarnings("ignore")
 from pathlib import Path
 
 import numpy as np
@@ -69,6 +71,8 @@ def main():
     firms = pd.read_csv(HERE.parent / "Datasets" / "Sampling Frame" / "Sample Firms.csv")
     macro = pd.read_csv(DER / "Macro Monthly.csv")
     text = text_variables(text)
+    upd = pd.read_csv(DER / "Updating Measure.csv")
+    text = text.drop(columns="updating").merge(upd, on=["cik", "fiscal_year"], how="left")
     excl = pd.read_csv(HERE.parent / "Datasets" / "Sampling Frame" / "Frame Validation Exclusions.csv")
     firms = firms[~firms["cik"].isin(excl["cik"])]
     firms = firms[["cik", "name", "sic", "division", "state_incorporation", "sampling_weight", "float"]]
@@ -79,7 +83,10 @@ def main():
     g = p.groupby("cik")
     # accounting variables
     p["ln_assets"] = np.log(p["assets"].where(p["assets"] > 0))
-    p["leverage"] = p["liabilities"] / p["assets"]
+    p["liabilities_source"] = np.where(p["liabilities"].notna(), "Liabilities",
+                                       np.where(p["equity"].notna(), "assets less equity", ""))
+    p["liabilities_filled"] = p["liabilities"].fillna(p["assets"] - p["equity"])
+    p["leverage"] = p["liabilities_filled"] / p["assets"]
     p["cash_ratio"] = p["cash"] / p["assets"]
     p["roa"] = p["net_income"] / p["assets"]
     fallback = p["revenue"] - p["costs_and_expenses"]

@@ -44,7 +44,7 @@ def main(src: Path, out: Path):
     parts = sorted(src.glob("Filing Texts Part *.jsonl.gz"), key=lambda p: (len(p.stem), p.stem))
     rows, pair_rows = [], []
     prev_vec: dict[int, tuple[int, Counter]] = {}
-    rng = random.Random(20251025)
+    rng = random.Random(int(__import__("os").environ.get("VALIDATION_SEED", "20251025")))
     pool = {c: [] for c in CATS}
     pool["none"] = []
     pool_action = []

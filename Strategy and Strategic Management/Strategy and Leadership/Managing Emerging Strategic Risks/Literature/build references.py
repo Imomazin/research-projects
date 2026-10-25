@@ -21,15 +21,34 @@ EXTRA = HERE / "Manual Verified References.json"
 MANUAL = json.loads(EXTRA.read_text()) if EXTRA.exists() else {}
 
 
+SMALL = {"a", "an", "and", "as", "at", "by", "for", "from", "in", "of", "on", "or", "the", "to", "with", "versus", "vs"}
+
+
 def initials(given: str) -> str:
-    parts = re.split(r"[\s\-]+", given.strip())
-    return "".join(p[0] + "." for p in parts if p)
+    given = re.sub(r"\(.*?\)", "", given)
+    parts = [p for p in re.split(r"[\s\-\.]+", given.strip()) if p and p[0].isalpha()]
+    return "".join(p[0].upper() + "." for p in parts)
+
+
+def fix_case(name: str) -> str:
+    if not name.isupper():
+        return name
+    n = name.title()
+    return re.sub(r"\bMc([a-z])", lambda m: "Mc" + m.group(1).upper(), n)
+
+
+def title_case_if_upper(t: str) -> str:
+    letters = [c for c in t if c.isalpha()]
+    if letters and sum(c.isupper() for c in letters) / len(letters) > 0.8:
+        words = t.lower().split()
+        return " ".join(w if (i and w in SMALL) else w[:1].upper() + w[1:] for i, w in enumerate(words))
+    return t
 
 
 def clean(t: str) -> str:
     t = html.unescape(re.sub(r"<[^>]+>", "", t or "")).strip()
-    t = re.sub(r"\s+", " ", t)
-    return t.rstrip("*")
+    t = re.sub(r"\s+", " ", t).replace("\u2729", "").replace("\u2010", "-").strip()
+    return t.rstrip("*").rstrip(".").strip()
 
 
 def authors_from(m: dict, oa: dict | None) -> list[tuple[str, str]]:
@@ -42,7 +61,7 @@ def authors_from(m: dict, oa: dict | None) -> list[tuple[str, str]]:
 
 
 def fmt_authors(auths: list[tuple[str, str]]) -> str:
-    names = [f"{fam.title() if fam.isupper() else fam}, {initials(giv)}" for fam, giv in auths]
+    names = [f"{fix_case(fam)}, {initials(giv)}" for fam, giv in auths]
     if len(names) == 1:
         return names[0]
     return ", ".join(names[:-1]) + " and " + names[-1]
@@ -64,16 +83,19 @@ def entry(key: str) -> dict:
     m, oa = r["message"], r.get("openalex")
     auths = authors_from(m, oa)
     yr = year_of(m)
-    title = clean(m.get("title", [""])[0])
+    title = title_case_if_upper(clean(m.get("title", [""])[0]))
     venue = clean((m.get("container-title") or [""])[0])
     vol, iss = m.get("volume", ""), m.get("issue", "")
     page = m.get("page", "") or m.get("article-number", "")
-    if oa and (not vol or not page):
+    if oa and (not vol or not page or "-" not in page):
         b = oa.get("biblio", {})
         vol = vol or (b.get("volume") or "")
         iss = iss or (b.get("issue") or "")
-        if not page and b.get("first_page"):
-            page = b["first_page"] + ("-" + b["last_page"] if b.get("last_page") else "")
+        if b.get("first_page") and b.get("last_page") and (not page or "-" not in page) \
+                and (not page or b["first_page"] == page):
+            page = b["first_page"] + "-" + b["last_page"]
+        elif not page and b.get("first_page"):
+            page = b["first_page"]
     doi = m.get("DOI", "").lower()
     kind = m.get("type")
     if kind == "journal-article" and venue:
@@ -96,7 +118,7 @@ def entry(key: str) -> dict:
 
 def in_text(e: dict) -> str:
     a = e["authors"]
-    fix = lambda s: s.title() if s.isupper() else s
+    fix = fix_case
     if len(a) == 1:
         return f"{fix(a[0])}, {e['year']}"
     if len(a) == 2:

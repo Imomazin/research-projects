@@ -8,7 +8,8 @@ from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-TAXONOMY = json.loads((HERE / "Risk Taxonomy Dictionary.json").read_text())
+import os
+TAXONOMY = json.loads((HERE / os.environ.get("RISK_DICTIONARY", "Risk Taxonomy Dictionary.json")).read_text())
 CATS = list(TAXONOMY["categories"].keys())
 PATTERNS = {c: re.compile(r"(?:%s)" % "|".join(v["patterns"]), re.I) for c, v in TAXONOMY["categories"].items()}
 ACT = TAXONOMY["action_sentence"]
@@ -16,6 +17,7 @@ SUBJECT = re.compile(ACT["subject"], re.I)
 VERBS = re.compile(r"\b(?:%s)\b" % "|".join(ACT["verbs"]), re.I)
 MODALS = re.compile(ACT["exclude_modals"], re.I)
 ACCOUNTING = re.compile(ACT["exclude_accounting"], re.I)
+SELFDESC = re.compile(ACT.get("exclude_self_description", r"(?!x)x"), re.I)
 WINDOW = ACT["proximity_words"]
 CATALOGUE = TAXONOMY["hazard_catalogue_threshold"]
 WORD = re.compile(r"[a-z][a-z\-']+")
@@ -27,7 +29,8 @@ def classify(sentence: str) -> list[str]:
 
 def is_action(sentence: str) -> bool:
     return bool(SUBJECT.search(sentence) and VERBS.search(sentence)
-                and not MODALS.search(sentence) and not ACCOUNTING.search(sentence))
+                and not MODALS.search(sentence) and not ACCOUNTING.search(sentence)
+                and not SELFDESC.search(sentence))
 
 
 def action_categories(sentence: str) -> list[str]:

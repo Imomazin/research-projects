@@ -1,6 +1,6 @@
 {
-  "version": "baseline dictionary frozen before outcome analysis",
-  "notes": "Regular expressions applied case-insensitively at sentence level with word boundaries. A sentence is assigned to every category whose pattern matches. Terms were chosen from the category definitions in the research design before any outcome data were examined.",
+  "version": "revised dictionary after AI-assisted precision audit of the frozen original (see Analysis Plan deviations)",
+  "notes": "Regular expressions applied case-insensitively at sentence level with word boundaries. A sentence is assigned to every category whose pattern matches. Terms were chosen from the category definitions in the research design before any outcome data were examined. Revised once after the precision audit: economic-sanctions phrasing replaces bare 'sanctions'; supplier terms require dependency or disruption context; ESG investor-attention terms removed from climate; company abbreviations and 'automation' removed from technology; broader regulatory-change and IT-disruption phrasing added; action sentences exclude negations, passive observations and self-descriptions.",
   "categories": {
     "geopolitical": {
       "label": "Geopolitical conflict and instability",
@@ -13,7 +13,6 @@
         "hostilities",
         "invasion",
         "terroris\\w*",
-        "\\bsanctions?\\b",
         "embargo\\w*",
         "political (?:instability|unrest|turmoil|crisis|crises)",
         "civil unrest",
@@ -29,7 +28,13 @@
         "north korea\\w*",
         "regional conflicts?",
         "international conflicts?",
-        "acts of war"
+        "acts of war",
+        "(?:economic|trade|international|financial|export|u\\.s\\.|us|eu|western|ofac|government) sanctions",
+        "sanctions (?:against|on|imposed on|targeting|relating to) (?:russia|iran|china|venezuela|north korea|certain countries|countries)",
+        "sanctioned (?:countries|country|persons|entities|regions|jurisdictions|parties)",
+        "\\bofac\\b",
+        "sanctions regimes?",
+        "sanctions programs?"
       ]
     },
     "trade": {
@@ -68,7 +73,11 @@
         "executive orders?",
         "changes? in (?:u\\.s\\. |us |federal |government )?(?:trade |fiscal |monetary |economic )?polic\\w+",
         "change in administration",
-        "presidential administration"
+        "presidential administration",
+        "changes? (?:in|to) (?:\\w+ ){0,2}(?:laws?|regulations?|legislation|polic(?:y|ies))",
+        "new (?:or (?:additional|amended|changed|increasingly stringent|modified) )?(?:laws?|regulations?|rules)",
+        "digital services tax\\w*",
+        "(?:laws?|regulations?) (?:may|could) (?:change|be (?:changed|amended|enacted|adopted))"
       ]
     },
     "cyber": {
@@ -89,7 +98,8 @@
         "security incidents?",
         "network intrusions?",
         "system (?:failures?|outages?|interruptions?)",
-        "it (?:systems?|infrastructure) (?:failures?|outages?|disruptions?)"
+        "it (?:systems?|infrastructure) (?:failures?|outages?|disruptions?)",
+        "(?:disruptions?|failures?|breakdowns?|interruptions?|outages?) (?:of|in|to) (?:our )?(?:it|information technology|information|computer|technology) systems"
       ]
     },
     "technology": {
@@ -98,29 +108,28 @@
         "artificial intelligence",
         "machine learning",
         "generative ai",
-        "\\bai\\b",
         "large language models?",
         "\\bgenai\\b",
         "disruptive technolog\\w+",
         "technological disruption",
-        "technological (?:change|changes|developments|advances|innovation)",
         "rapid(?:ly)? (?:changing|evolving) technolog\\w*",
         "emerging technolog\\w+",
         "new technolog\\w+ (?:could|may|might) (?:render|make)",
         "technological obsolescence",
         "digital transformation",
-        "automation",
         "new entrants? (?:with|using) (?:new )?technolog\\w+",
         "technologically obsolete",
         "obsolete (?:technolog\\w*|products?|services?)",
-        "render (?:our |their )?(?:products?|services?|technolog\\w*|offerings?) (?:\\w+ )?obsolete"
+        "render (?:our |their )?(?:products?|services?|technolog\\w*|offerings?) (?:\\w+ )?obsolete",
+        "technological (?:change|changes|developments|advances)",
+        "(?-i:\\bAI\\b)",
+        "artificial intelligence"
       ]
     },
     "supply": {
       "label": "Supply-chain disruption",
       "patterns": [
         "supply chains?",
-        "suppliers?",
         "sole[- ]source\\w*",
         "single[- ]source\\w*",
         "limited number of (?:suppliers|sources|vendors|manufacturers)",
@@ -132,13 +141,18 @@
         "port (?:congestion|closures?|delays?)",
         "raw materials?",
         "semiconductor shortage",
-        "contract manufacturers?",
-        "third[- ]party manufacturers?",
         "supply disruptions?",
         "disruptions? (?:in|to|of) (?:our )?(?:supply|deliveries|delivery|production|manufacturing|distribution)",
         "availability of (?:raw materials|components|parts|inputs)",
         "components? (?:shortages?|supply|availability|suppliers?|constraints?)",
-        "(?:supply|availability|shortages?) of (?:\\w+ ){0,2}components?"
+        "(?:supply|availability|shortages?) of (?:\\w+ ){0,2}components?",
+        "(?:rely|relies|reliance|depend|depends|dependent|dependence) (?:up)?on (?:\\w+ ){0,4}(?:suppliers?|vendors|contract manufacturers?|third[- ]party manufacturers?|sole[- ]source)",
+        "(?:key|critical|sole|single|limited number of|principal|major) suppliers?",
+        "suppliers? (?:fail\\w*|disrupt\\w*|delay\\w*|shortages?|unable|capacity|concentration|financial difficult\\w*|may not|could not|cannot)",
+        "loss of (?:a |any |one or more |key )?(?:significant |major )?(?:suppliers?|vendors)",
+        "(?:alternative|alternate|additional|new) suppliers?",
+        "supplier (?:base|diversification|concentration)",
+        "inability (?:of|by) (?:our )?(?:suppliers?|contract manufacturers?)"
       ]
     },
     "climate": {
@@ -165,8 +179,9 @@
         "water scarcity",
         "physical risks? of climate",
         "transition (?:to a )?low[- ]carbon",
-        "esg",
-        "sustainability (?:regulations?|requirements?|reporting)"
+        "adverse weather",
+        "weather conditions",
+        "climate (?:disclosure|regulation)\\w*"
       ]
     },
     "macro": {
@@ -195,7 +210,8 @@
         "economic (?:downturns?|slowdowns?|uncertainty|instability|crisis|crises|weakness)",
         "(?:adverse|weak|weaker|poor|unfavou?rable|uncertain|volatile|deteriorating|negative) (?:global |general |macro)?economic conditions",
         "deteriorat\\w+ (?:in |of )?(?:global |general )?economic conditions",
-        "macroeconomic"
+        "macroeconomic",
+        "(?:pounds sterling|euros?|renminbi|yen) (?:exchange|exposure|denominated)"
       ]
     },
     "pandemic": {
@@ -213,8 +229,6 @@
         "influenza",
         "contagious diseases?",
         "infectious diseases?",
-        "\\bebola\\b",
-        "\\bzika\\b",
         "\\bmpox\\b",
         "monkeypox",
         "quarantines?",
@@ -269,13 +283,13 @@
       "migrated",
       "have (?:taken|implemented|invested|expanded|diversified|established|enhanced|strengthened|deployed|adopted|developed|launched)",
       "are (?:implementing|investing|expanding|diversifying|deploying|developing|enhancing|strengthening)",
-      "began",
       "initiated",
       "completed"
     ],
-    "exclude_modals": "\\b(?:may|might|could|would|should|if|cannot|can not|unable)\\b",
+    "exclude_modals": "\\b(?:may|might|could|would|should|if|cannot|can not|unable|not|no|never|began to (?:see|experience|feel))\\b",
     "proximity_words": 12,
-    "exclude_accounting": "\\b(?:accounting for|recogni[sz]ed|recorded|impairment|amorti[sz]ation|depreciation|fair value|provision for|deferred tax|effective tax rate)\\b"
+    "exclude_accounting": "\\b(?:accounting for|recogni[sz]ed|recorded|impairment|amorti[sz]ation|depreciation|fair value|provision for|deferred tax|effective tax rate)\\b",
+    "exclude_self_description": "\\b(?:we are|the company is|is) (?:a|an|the|one of the) (?:\\w+ ){0,5}(?:supplier|provider|manufacturer|distributor)\\b"
   },
   "hazard_catalogue_threshold": 4
 }
