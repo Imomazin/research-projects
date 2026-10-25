@@ -35,9 +35,13 @@ def stage_literature(client, proj: Path, data: Path, log: list, **kw):
             body = client.get(url, sec=False)
             records[r["key"]] = {"doi": r["doi"],
                                  "message": json.loads(body)["message"] if body else None}
+            time.sleep(0.3)
+            oa = client.get(f"https://api.openalex.org/works/doi:{quote(r['doi'], safe='/')}?mailto={MAILTO}", sec=False)
+            records[r["key"]]["openalex"] = json.loads(oa) if oa else None
         if r["title_query"]:
             url = ("https://api.crossref.org/works?rows=5&mailto=" + MAILTO +
                    "&query.bibliographic=" + quote(r["title_query"]))
+            time.sleep(1.0)
             body = client.get(url, sec=False)
             items = json.loads(body)["message"]["items"] if body else []
             records.setdefault(r["key"], {})["search"] = items
@@ -51,6 +55,7 @@ def stage_literature(client, proj: Path, data: Path, log: list, **kw):
                  "cyber", "artificial intelligence", "volatility", "turbulence"]:
         url = (f"https://api.crossref.org/journals/{SL_ISSN}/works?rows=100&mailto={MAILTO}"
                f"&filter=from-pub-date:2016-01-01&query.bibliographic={quote(term)}")
+        time.sleep(1.0)
         body = client.get(url, sec=False)
         if body:
             for it in json.loads(body)["message"]["items"]:
@@ -73,6 +78,7 @@ def stage_literature(client, proj: Path, data: Path, log: list, **kw):
                  "corporate foresight firm performance longitudinal"]:
         url = ("https://api.crossref.org/works?rows=25&mailto=" + MAILTO +
                "&filter=from-pub-date:2012-01-01,type:journal-article&query.bibliographic=" + quote(term))
+        time.sleep(1.0)
         body = client.get(url, sec=False)
         if body:
             wide[term] = json.loads(body)["message"]["items"]
