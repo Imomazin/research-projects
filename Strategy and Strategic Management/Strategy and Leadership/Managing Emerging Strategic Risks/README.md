@@ -32,6 +32,8 @@ Python 3.11 to 3.13 with pandas, numpy, statsmodels 0.15, linearmodels 7.1, scik
 
 ## Revision (branch revision/strategic-risk, 25 October 2026)
 
+All revision results, manuscripts and datasets were produced at commit 1fed4b2; the workbook and this README were refreshed in the following commit.
+
 The revision reproduces the first version from the raw data, rebuilds the documented-response measure, adds small-cluster and multiple-testing inference, tests alternative convergence measures and shock channels, and rewrites the manuscript. The first-version files above are preserved unchanged.
 
 Deliverables:
