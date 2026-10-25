@@ -475,5 +475,95 @@ def stage_facts(client, proj: Path, data: Path, log: list, **kw):
     log.append(f"company facts rows {n}; firms missing {missing}")
 
 
+# --------------------------------------------------------------------- revision sources
+
+FRED_SERIES = {"CPIAUCSL": "Consumer Price Index All Urban Consumers.csv",
+               "PPIFIS": "Producer Price Index Final Demand.csv",
+               "PCUOMFGOMFG": "Producer Price Index Total Manufacturing Industries.csv"}
+
+
+def stage_revision(client, proj: Path, data: Path, log: list, **kw):
+    """Price indices for deflation, a version check of the stored macro files, fresh Crossref
+    and OpenAlex records for every cited and candidate reference, and searches for recent
+    competing studies."""
+    import hashlib
+    out = proj / "Datasets" / "Raw Macro" / "Revision"
+    out.mkdir(parents=True, exist_ok=True)
+    manifest = []
+    for sid, name in FRED_SERIES.items():
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}"
+        body = client.get(url, sec=False, use_cache=False)
+        if body:
+            (out / name).write_bytes(body)
+        manifest.append({"file": name, "url": url, "status": "downloaded" if body else "failed",
+                         "bytes": len(body) if body else "", "sha256": hashlib.sha256(body).hexdigest() if body else "",
+                         "retrieved": now()})
+        time.sleep(2)
+    stored = list(csv.DictReader(open(proj / "Datasets" / "Raw Macro" / "Macro Retrieval Manifest.csv")))
+    for r in stored:
+        if r["status"] != "downloaded":
+            continue
+        time.sleep(4)
+        body = client.get(r["url"], sec=False, use_cache=False)
+        sha = hashlib.sha256(body).hexdigest() if body else ""
+        local = proj / "Datasets" / "Raw Macro" / r["file"]
+        manifest.append({"file": "version check: " + r["file"], "url": r["url"], "status": "downloaded" if body else "failed",
+                         "bytes": len(body) if body else "", "sha256": sha, "retrieved": now(),
+                         "stored_sha256": r["sha256"], "stored_file_present": local.exists(),
+                         "identical_to_stored": bool(body) and sha == r["sha256"]})
+    with open(out / "Revision Retrieval Manifest.csv", "w", newline="") as fh:
+        keys = ["file", "url", "status", "bytes", "sha256", "retrieved", "stored_sha256", "stored_file_present", "identical_to_stored"]
+        w = csv.DictWriter(fh, fieldnames=keys)
+        w.writeheader()
+        w.writerows(manifest)
+    log.append(f"revision macro files: {len(manifest)}")
+    lit = proj / "Literature"
+    recs = {}
+    bib = list(csv.DictReader(open(lit / "Verified Bibliography.csv")))
+    cand = list(csv.DictReader(open(lit / "Revision Candidate References.csv")))
+    for r in bib + cand:
+        key, doi, tq = r["key"], r.get("doi", ""), r.get("title_query", "")
+        rec = {}
+        if doi:
+            body = client.get(f"https://api.crossref.org/works/{quote(doi, safe='')}?mailto={MAILTO}", sec=False, use_cache=False)
+            rec["doi"] = doi
+            rec["message"] = json.loads(body)["message"] if body else None
+            oa = client.get(f"https://api.openalex.org/works/doi:{quote(doi, safe='/')}?mailto={MAILTO}", sec=False, use_cache=False)
+            rec["openalex"] = json.loads(oa) if oa else None
+            time.sleep(0.4)
+        if tq:
+            body = client.get("https://api.crossref.org/works?rows=5&mailto=" + MAILTO + "&query.bibliographic=" + quote(tq),
+                              sec=False, use_cache=False)
+            rec["search"] = json.loads(body)["message"]["items"] if body else []
+            time.sleep(1.0)
+        recs[key] = rec
+    (lit / "Crossref Records" / "Revision Reference Records.json").write_text(json.dumps(recs, indent=1))
+    log.append(f"revision reference records: {len(recs)}; doi hits {sum(1 for v in recs.values() if v.get('message'))}")
+    wide = {}
+    for term in ["risk factor disclosure boilerplate informativeness", "number of risk factors 10-K firm",
+                 "risk disclosure similarity across firms homogeneity", "risk factor disclosure regulation S-K 2020 summary",
+                 "textual risk disclosure organizational resilience", "multiple risks co-occurrence firm disclosure",
+                 "polycrisis firms strategy", "strategic response crisis firms text analysis",
+                 "supply chain risk disclosure pandemic performance", "documented risk mitigation disclosure firm actions",
+                 "dynamic capabilities sensing seizing reconfiguring measurement text", "organisational resilience revenue recovery covid firms",
+                 "inflation pass-through firms 2022 prices margins", "geopolitical risk firm exposure 2022 Russia Ukraine"]:
+        body = client.get("https://api.crossref.org/works?rows=30&mailto=" + MAILTO +
+                          "&filter=from-pub-date:2023-01-01,type:journal-article&query.bibliographic=" + quote(term),
+                          sec=False, use_cache=False)
+        if body:
+            wide[term] = json.loads(body)["message"]["items"]
+        time.sleep(1.0)
+    sl = {}
+    for term in ["risk", "uncertainty", "resilience", "crisis", "disruption", "geopolitical", "strategy", "leadership"]:
+        body = client.get(f"https://api.crossref.org/journals/{SL_ISSN}/works?rows=100&mailto={MAILTO}"
+                          f"&filter=from-pub-date:2024-01-01&query.bibliographic={quote(term)}", sec=False, use_cache=False)
+        if body:
+            for it in json.loads(body)["message"]["items"]:
+                sl[it["DOI"]] = it
+        time.sleep(1.0)
+    (lit / "Crossref Records" / "Revision Literature Searches.json").write_text(json.dumps({"wide": wide, "strategy_and_leadership": list(sl.values())}, indent=1))
+    log.append(f"revision searches: {len(wide)} terms; S&L records since 2024: {len(sl)}")
+
+
 STAGES = {"literature": stage_literature, "frame": stage_frame, "macro": stage_macro,
-          "filings": stage_filings, "facts": stage_facts}
+          "filings": stage_filings, "facts": stage_facts, "revision": stage_revision}

@@ -195,7 +195,8 @@ def main():
         (logdir / "Latest Status.txt").write_text(f"{stage} {status} data push {now()}\n")
     git("config", "user.name", "strategic-risk-pipeline")
     git("config", "user.email", "actions@users.noreply.github.com")
-    push(REPO, "research/strategic-risk", f"Pipeline stage {stage} {status}")
+    import os
+    push(REPO, os.environ.get("GITHUB_REF_NAME", "research/strategic-risk"), f"Pipeline stage {stage} {status}")
     if status != "completed":
         sys.exit(1)
 
