@@ -1,0 +1,29 @@
+name: Strategic risk pipeline
+on:
+  push:
+    branches: [research/strategic-risk]
+    paths:
+      - 'Strategy and Strategic Management/Strategy and Leadership/Managing Emerging Strategic Risks/Data Collection/Run Request.txt'
+permissions:
+  contents: write
+concurrency:
+  group: strategic-risk-pipeline
+  cancel-in-progress: false
+env:
+  PROJ: Strategy and Strategic Management/Strategy and Leadership/Managing Emerging Strategic Risks
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/strategic-risk
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r "$PROJ/Data Collection/requirements.txt"
+      - name: Run requested stage
+        run: python "$PROJ/Data Collection/run stage.py"
