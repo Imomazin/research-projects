@@ -7,6 +7,7 @@ import datetime as dt
 import gzip
 import io
 import json
+import os
 import random
 import re
 import time
@@ -722,5 +723,53 @@ def stage_references(client, proj: Path, data: Path, log: list, **kw):
     log.append(f"candidate records {len(recs)}; doi hits {sum(1 for v in recs.values() if v.get('message'))}")
 
 
+def stage_nli_full(client, proj: Path, data: Path, log: list, **kw):
+    """Score every candidate pair with the implemented-action hypothesis, at the model revision used for
+    the validation sample. The validation items are rescored in the same batched run as a consistency check."""
+    import subprocess, sys
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "torch==2.5.1", "--index-url",
+                    "https://download.pytorch.org/whl/cpu"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "transformers==4.46.3", "sentencepiece==0.2.0",
+                    "protobuf==5.28.3"], check=True)
+    import torch
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    torch.set_num_threads(max(1, os.cpu_count() or 1))
+    rev = [l.split()[1] for l in (proj / "Validation" / "Language Model Version.txt").read_text().splitlines() if l.startswith("revision")][0]
+    tok = AutoTokenizer.from_pretrained(NLI_MODEL, revision=rev)
+    mod = AutoModelForSequenceClassification.from_pretrained(NLI_MODEL, revision=rev).eval()
+    ent = {v.lower(): k for k, v in mod.config.id2label.items()}["entailment"]
+    hyp = "The company has already taken an action to reduce or manage its exposure to {}."
+
+    def score(pairs, bs=32):
+        order = sorted(range(len(pairs)), key=lambda i: len(pairs[i][0]))
+        out = [None] * len(pairs)
+        for k in range(0, len(order), bs):
+            idx = order[k:k + bs]
+            enc = tok([pairs[i][0][:2000] for i in idx], [hyp.format(CAT_PHRASE[pairs[i][1]]) for i in idx],
+                      return_tensors="pt", truncation=True, max_length=512, padding=True)
+            with torch.no_grad():
+                pr = torch.softmax(mod(**enc).logits, dim=-1)[:, ent]
+            for i, v in zip(idx, pr.tolist()):
+                out[i] = round(float(v), 4)
+        return out
+
+    val = list(csv.DictReader(open(proj / "Validation" / "Response Validation Sample.csv")))
+    stored = {r["item_id"]: float(r["entail_implemented"]) for r in csv.DictReader(open(proj / "Validation" / "Response Validation Language Model Scores.csv"))}
+    vs = score([(r["sentence"], r["category"]) for r in val])
+    diffs = [abs(a - stored[r["item_id"]]) for r, a in zip(val, vs)]
+    agree = sum((a >= 0.5) == (stored[r["item_id"]] >= 0.5) for r, a in zip(val, vs))
+    log.append(f"validation rescoring: max abs difference {max(diffs):.4f}; same classification {agree} of {len(val)}")
+    src = proj / "Datasets" / "Derived" / "Revision" / "Response Candidate Pairs.jsonl.gz"
+    rows = [json.loads(l) for l in gzip.open(src, "rt")]
+    t0 = time.time()
+    sc = score([(r["sentence"], r["category"]) for r in rows])
+    with gzip.open(proj / "Datasets" / "Derived" / "Revision" / "Response Candidate Language Model Scores.csv.gz", "wt", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["cik", "fiscal_year", "sentence_index", "category", "stratum", "entail_implemented"])
+        for r, v in zip(rows, sc):
+            w.writerow([r["cik"], r["fiscal_year"], r["sentence_index"], r["category"], r["stratum"], v])
+    log.append(f"scored {len(rows)} candidate pairs in {(time.time() - t0) / 60:.1f} minutes with {NLI_MODEL}@{rev}")
+
+
 STAGES = {"literature": stage_literature, "frame": stage_frame, "macro": stage_macro,
-          "filings": stage_filings, "facts": stage_facts, "revision": stage_revision, "nli": stage_nli, "convergence": stage_convergence, "prices": stage_prices, "references": stage_references}
+          "filings": stage_filings, "facts": stage_facts, "revision": stage_revision, "nli": stage_nli, "convergence": stage_convergence, "prices": stage_prices, "references": stage_references, "corpusnli": stage_nli_full}
