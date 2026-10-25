@@ -1,0 +1,44 @@
+Variable,Category,Definition,Source,Timing
+cik,Firm identification,SEC Central Index Key,SEC EDGAR submissions,Fixed
+fiscal_year,Firm identification,Fiscal year; years ending January to May are assigned to the previous calendar year,Derived from period of report,Annual
+fy_end,Firm identification,Fiscal year-end date,SEC XBRL company facts,Annual
+filing_date,Firm identification,Date the 10-K became public on EDGAR,SEC EDGAR submissions,Annual
+accession,Firm identification,EDGAR accession number of the 10-K,SEC EDGAR submissions,Annual
+sic / sic2 / division,Firm characteristics,Four-digit SIC; two-digit SIC; SIC division,SEC EDGAR submissions,Current SIC
+us_incorporated,Firm characteristics,One if the state of incorporation is a US state code,SEC EDGAR submissions,Current
+sampling_weight,Sampling,Inverse sampling fraction of the firm's SIC division stratum,Sample design,Fixed
+n_sent_1a,Text,Number of sentences in Item 1A (Risk Factors),10-K Item 1A,Filing
+item1a_words / ln_item1a_words,Text,Words in Item 1A and its natural logarithm plus one,10-K Item 1A,Filing
+cnt_[category],Emerging risk exposure,Item 1A sentences matching the category dictionary (nine categories),10-K Item 1A,Filing
+int_[category],Emerging risk exposure,cnt_[category] divided by n_sent_1a,10-K Item 1A,Filing
+mat_[category],Emerging risk exposure,One if cnt_[category] is at least three sentences,10-K Item 1A,Filing
+breadth,Risk convergence,Number of material categories (0 to 9),10-K Item 1A,Filing
+linkage,Risk convergence,Share of Item 1A sentences naming two or three categories,10-K Item 1A,Filing
+catalogue_share,Risk convergence,Share of Item 1A sentences naming four or more categories (hazard catalogues),10-K Item 1A,Filing
+diversity,Risk convergence,Exponential of Shannon entropy of category sentence counts,10-K Item 1A,Filing
+act_[category],Strategic response,Item 1 and Item 7 sentences with an organisational subject and a realised action verb within twelve words of a category term and no modal or accounting-treatment terms,10-K Items 1 and 7,Filing
+coverage,Strategic response,Share of material categories with at least one action sentence,10-K Items 1 1A and 7,Filing
+alignment,Strategic response,Cosine similarity between category vectors of risk sentences and action sentences,10-K Items 1 1A and 7,Filing
+updating,Strategic anticipation,One minus cosine similarity of Item 1A term frequencies with the previous fiscal year,10-K Item 1A,Filing
+revenue,Organisational outcomes,Annual revenue as first reported (priority order of revenue concepts in build financial panel.py),SEC XBRL company facts,Annual
+op_margin,Organisational outcomes,Operating income divided by revenue,SEC XBRL company facts,Annual
+rev_growth,Organisational outcomes,Log change in revenue from the previous fiscal year,SEC XBRL company facts,Annual
+d_op_margin,Organisational outcomes,Change in operating margin from the previous fiscal year,SEC XBRL company facts,Annual
+adverse,Organisational outcomes,One if revenue fell at least ten percent or operating margin fell at least five points,SEC XBRL company facts,Annual
+severity (Episode A),Organisational resilience,ln(revenue FY2020 / revenue FY2019),SEC XBRL company facts,Shock window
+margin_change (Episode A),Organisational resilience,Operating margin FY2020 minus FY2019,SEC XBRL company facts,Shock window
+recovery (Episode A),Organisational resilience,ln(revenue FY2022 / revenue FY2019),SEC XBRL company facts,Recovery window
+recovered (Episode A),Organisational resilience,One if FY2021 revenue at least equals FY2019 revenue,SEC XBRL company facts,Recovery window
+margin_change / margin_change_two (Episode B),Organisational resilience,Operating margin FY2022 or FY2023 minus FY2021,SEC XBRL company facts,Shock window
+severity (Episode B),Organisational resilience,ln(revenue FY2023 / revenue FY2021),SEC XBRL company facts,Shock window
+ln_assets,Firm characteristics,Natural log of total assets,SEC XBRL company facts,Annual
+leverage,Firm characteristics,Total liabilities divided by total assets,SEC XBRL company facts,Annual
+cash_ratio,Firm characteristics,Cash and equivalents divided by total assets,SEC XBRL company facts,Annual
+roa,Firm characteristics,Net income divided by total assets,SEC XBRL company facts,Annual
+prior_growth,Firm characteristics,Average annual log revenue growth over the two years before the base year,SEC XBRL company facts,Annual
+reconfiguration,Strategic response,Capital expenditure plus research and development plus acquisition outlays divided by lagged assets,SEC XBRL company facts,Annual
+foreign_share,Firm characteristics,Foreign pre-tax income divided by absolute total pre-tax income (bounded at plus or minus two),SEC XBRL company facts,Annual
+fy_gpr / fy_gpr_threats / fy_gpr_acts,External uncertainty,Twelve-month average of the Geopolitical Risk index ending in the fiscal year-end month,Caldara and Iacoviello GPR,Fiscal year
+fy_epu_us / fy_epu_trade / fy_epu_regulation,External uncertainty,Twelve-month averages of US economic policy uncertainty and its trade policy and regulation components,Baker Bloom and Davis EPU,Fiscal year
+fy_gscpi,External uncertainty,Twelve-month average of the Global Supply Chain Pressure Index,Federal Reserve Bank of New York,Fiscal year
+fy_wui_global / fy_wui_usa,External uncertainty,Twelve-month average of the World Uncertainty Index (quarterly values assigned to months),Ahir Bloom and Furceri WUI,Fiscal year
