@@ -37,6 +37,8 @@ if LM.exists():
     D["lm_and_high"] = ((D["lm_positive"] == 1) & (D["revised_positive"] == 1)).astype(int)
     RULES["Language model (entailment at least 0.5)"] = "lm_positive"
     RULES["Revised rules confirmed by language model"] = "lm_and_high"
+    D["lm_candidates"] = ((D["lm_positive"] == 1) & (D["stratum"] != "other")).astype(int)
+    RULES["Language model on candidate pairs (measure used in the models)"] = "lm_candidates"
 
 
 def wilson(k, n, z=1.96):

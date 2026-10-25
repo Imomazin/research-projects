@@ -7,7 +7,9 @@ reference coding none of the 27 remainder-stratum pairs qualified, so scoring is
 the candidates. Classification functions are imported from build response measures.py
 unchanged, so strata are identical to those used for the validation draw.
 
-Usage: python "export response candidates.py" <folder with Filing Texts parts> <output .jsonl.gz>
+Usage: python "export response candidates.py" <folder with Filing Texts parts> <output .jsonl.gz> [part letters, e.g. ABC]
+With part letters, only those parts are read; the per-part outputs are concatenated afterwards
+(gzip members concatenate into a valid gzip file).
 """
 import gzip
 import importlib.util
@@ -21,7 +23,7 @@ B = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(B)
 
 
-def main(src: Path, out: Path):
+def main(src: Path, out: Path, parts: str = ""):
     import pandas as pd
     firms = pd.read_csv(B.PROJ / "Datasets" / "Sampling Frame" / "Sample Firms.csv")
     excl = pd.read_csv(B.PROJ / "Datasets" / "Sampling Frame" / "Frame Validation Exclusions.csv")
@@ -30,6 +32,8 @@ def main(src: Path, out: Path):
     counts = {}
     with gzip.open(out, "wt") as fo:
         for p in sorted(src.glob("Filing Texts Part *.jsonl.gz"), key=lambda p: (len(p.stem), p.stem)):
+            if parts and p.name.split("Part ")[1].split(".")[0] not in parts:
+                continue
             with gzip.open(p, "rt") as fh:
                 for line in fh:
                     r = json.loads(line)
@@ -57,4 +61,4 @@ def main(src: Path, out: Path):
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]), Path(sys.argv[2]))
+    main(Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3] if len(sys.argv) > 3 else "")

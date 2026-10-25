@@ -29,3 +29,20 @@ Data collected, measures built, pre-registered models estimated and the manuscri
 6. `python "Manuscript/collect numbers.py"`, `python "Manuscript/build blocks.py"`, `node "Manuscript/build manuscript.js" <out.docx> [anonymised]`, `python "Results/build workbook.py"`
 
 Python 3.11 to 3.13 with pandas, numpy, statsmodels 0.15, linearmodels 7.1, scikit-learn, lxml, matplotlib; Node with docx 9.
+
+## Revision (branch revision/strategic-risk, 25 October 2026)
+
+The revision reproduces the first version from the raw data, rebuilds the documented-response measure, adds small-cluster and multiple-testing inference, tests alternative convergence measures and shock channels, and rewrites the manuscript. The first-version files above are preserved unchanged.
+
+Deliverables:
+
+- Manuscript/Managing Emerging Strategic Risks Revised Manuscript.docx and Submission/Managing Emerging Strategic Risks Revised Anonymised Manuscript.docx
+- Results/Managing Emerging Strategic Risks Revision Workbook.xlsx (read me and reproducibility record, data dictionary and inventory, reconciliation, corrections register, sample and validation, hypothesis tests, robustness, convergence and shocks, figure data)
+- Datasets/Revision Data Dictionary.csv, Datasets/Revision Dataset Manifest.csv and Datasets/Derived/Revision/
+- Validation/Response Coding Manual.md, the validation sample, AI reference coding, blank human coding sheets and Validation/compute agreement.py. Human double-coding has not been done; the reference labels were assigned by an AI assistant and are not human annotation.
+- Reproduction/ (reproduce study.py, independent checks.py, Reconciliation Report.csv, File Comparison.csv, Corrections Register.csv)
+- Analysis/Analysis Plan.md, section Revision deviations
+
+Revision run order: `python Reproduction/"reproduce study.py" --data <data branch> --work <folder>`; `python Analysis/"export response candidates.py" "<data branch>/Filing Texts" "Datasets/Derived/Revision/Response Candidate Pairs.jsonl.gz"`; push `stage: corpusnli` in Data Collection/Run Request.txt to score candidates in GitHub Actions; `python Validation/"validate response measures.py"`; `python Analysis/"revision models.py"`; `python Analysis/"make revision figures.py"`; `python Manuscript/"collect revision numbers.py"`; `python Reproduction/"build corrections register.py"`; `python Analysis/"build revision manifest.py"`; `python Manuscript/"build blocks revision.py"`; `node Manuscript/"build manuscript revision.js" <out.docx> [anonymised]`; `python Results/Revision/"build revision workbook.py"`.
+
+Repository visibility: this repository is public on GitHub. Draft manuscripts and derived data held here are visible to anyone until the repository is made private.

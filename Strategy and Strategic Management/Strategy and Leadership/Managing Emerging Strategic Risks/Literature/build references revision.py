@@ -113,6 +113,11 @@ def entry(key: str) -> dict:
             page = b["first_page"] + "-" + b["last_page"]
         elif not page and b.get("first_page"):
             page = b["first_page"]
+    if m.get("article-number"):
+        page = str(m["article-number"])            # article number, not a page range
+    elif "-" in page and len(set(page.split("-"))) == 1:
+        page = page.split("-")[0]
+    title = re.sub(r"\s+:", ":", title)
     doi = m.get("DOI", "").lower()
     kind = m.get("type")
     if kind == "proceedings-article" and venue:

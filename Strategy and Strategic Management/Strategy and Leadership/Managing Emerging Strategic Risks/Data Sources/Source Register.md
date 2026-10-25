@@ -10,6 +10,9 @@
 | World Uncertainty Index | Quarterly global and country | https://worlduncertaintyindex.com/data/ | Supplementary | WUI collected; pandemic and spillover files refused with HTTP 429 |
 | NY Fed GSCPI | Monthly index | https://www.newyorkfed.org/research/policy/gscpi | Supply-chain shock | Collected (data to September 2026) |
 | Crossref and OpenAlex | Bibliographic metadata | api.crossref.org, api.openalex.org | Reference verification | Collected |
+| BLS consumer and producer price indices (revision) | CPI-U all items SA (CUSR0000SA0); PPI final demand (WPSFD4) | https://download.bls.gov/pub/time.series/ (API v2 returned HTTP 503) | Deflating revenue; inflation context | Collected 25 Oct 2026; October 2025 CPI missing in the BLS file and interpolated |
+| Hugging Face model hub (revision) | MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli, revision 6f5cf0a2 | https://huggingface.co/ | Zero-shot response classifier | Downloaded in GitHub Actions; MIT licence |
+| Macro index re-download (revision) | GPR, EPU, WUI, GSCPI | as above | Version check | 25 Oct 2026; byte-identical to stored files |
 | World Bank Enterprise Surveys | Firm survey microdata | https://www.enterprisesurveys.org/ | Considered | Not used: different units (non-US firms, survey waves) |
 | AI Incident Database | AI incidents | https://incidentdatabase.ai/ | Considered | Not used: no firm-level link to the sample |
 | WEF Global Risks Report | Risk perceptions | https://www.weforum.org/publications/ | Context only | Not used as data |

@@ -33,6 +33,18 @@ OUT: dict = {}
 rng_master = np.random.default_rng(20261027)
 
 
+def bh(p):
+    """Benjamini-Hochberg adjusted p-values (step-up), returned in the input order."""
+    p = np.asarray(p, float)
+    m = len(p)
+    o = np.argsort(p)
+    adj = p[o] * m / np.arange(1, m + 1)
+    adj = np.minimum.accumulate(adj[::-1])[::-1]
+    out = np.empty(m)
+    out[o] = np.clip(adj, 0, 1)
+    return out
+
+
 def winsor(s, lo=0.01, hi=0.99):
     a, b = s.quantile([lo, hi])
     return s.clip(a, b)
@@ -133,6 +145,15 @@ RM = pd.read_csv(DER / "Revision" / "Response Measures.csv")
 CV = pd.read_csv(DER / "Revision" / "Convergence Measures.csv")
 P = P.merge(RM.drop(columns=["accession", "n_sent_response"]), on=["cik", "fiscal_year"], how="left")
 P = P.merge(CV.drop(columns=["n_sent_1a"]), on=["cik", "fiscal_year"], how="left")
+LMF = DER / "Revision" / "Response Candidate Language Model Scores.csv.gz"
+if LMF.exists():
+    lmsc = pd.read_csv(LMF)
+    OUT["lm_candidates"] = {"pairs": int(len(lmsc)), "positive": int((lmsc["entail_implemented"] >= 0.5).sum())}
+    lmc = (lmsc[lmsc["entail_implemented"] >= 0.5].groupby(["cik", "fiscal_year", "category"]).size()
+           .unstack(fill_value=0).reindex(columns=CATS, fill_value=0).add_prefix("act_lm_").reset_index())
+    P = P.merge(lmc, on=["cik", "fiscal_year"], how="left")
+    for c in CATS:
+        P[f"act_lm_{c}"] = P[f"act_lm_{c}"].fillna(0).where(P["n_high_sentences"].notna() & P["fiscal_year"].between(2017, 2025))
 cnt = P[[f"cnt_{c}" for c in CATS]].to_numpy(float)
 mat = cnt >= 3
 nm = mat.sum(1)
@@ -148,6 +169,7 @@ P["cov_revised"] = coverage("act_revised")
 P["cov_high"] = coverage("act_high")
 P["cov_revised_two"] = coverage("act_revised", 2)
 P["cov_high_resource"] = coverage("act_high_resource")
+P["cov_lm"] = coverage("act_lm") if LMF.exists() else np.nan
 P["any_high"] = (P[[f"act_high_{c}" for c in CATS]].sum(1) > 0).astype(float).where(P["n_high_sentences"].notna())
 OUT["check_revised_equals_panel_coverage"] = float(np.nanmax(np.abs(P["cov_revised"] - P["coverage"])))
 # alternative convergence measures
@@ -182,6 +204,13 @@ P["ln_inventory"] = np.log(P["inventory"].where(P["inventory"] > 0))
 idx = pd.read_csv(PROJ / "Datasets" / "Filings Index.csv")[["cik", "fiscal_year", "text_chars"]]
 P = P.merge(idx, on=["cik", "fiscal_year"], how="left")
 P["ln_text_chars"] = np.log(P["text_chars"])
+# analysis-ready firm-year file of every revision measure (documented in Datasets/Revision Data Dictionary.csv)
+REV_COLS = ["cik", "fiscal_year", "sic2", "division", "breadth", "breadth_t1", "breadth_t5", "breadth_specific", "breadth_nocat",
+            "breadth_industry_adj", "mention_density", "diversity", "linkage", "linked_pairs", "interaction_share", "composition_change",
+            "novelty", "boilerplate_share", "cov_original", "cov_revised", "cov_high", "cov_revised_two", "cov_high_resource", "cov_lm",
+            "any_high", "item1a_words", "item1_words", "item7_words"] + [f"cnt_{c}" for c in CATS] + \
+           [f"act_{r}_{c}" for r in ("original", "revised", "high", "lm") for c in CATS]
+P[[c for c in REV_COLS if c in P]][P["n_sent_1a"].notna()].to_csv(DER / "Revision" / "Revision Firm Year Measures.csv", index=False)
 
 
 def wide(var, year):
@@ -189,10 +218,10 @@ def wide(var, year):
 
 
 TEXT_KEEP = INTS + ["breadth", "coverage", "linkage", "diversity", "ln_item1a_words", "n_sent_1a", "filing_date",
-                    "cov_original", "cov_revised", "cov_high", "cov_revised_two", "cov_high_resource", "any_high", "any_action",
+                    "cov_original", "cov_revised", "cov_high", "cov_revised_two", "cov_high_resource", "cov_lm", "any_high", "any_action",
                     "breadth_t1", "breadth_t5", "mention_density", "breadth_specific", "boilerplate_share", "interaction_share",
                     "linked_pairs", "composition_change", "novelty", "breadth_industry_adj", "ln_item1_words", "ln_text_chars", "breadth_nocat",
-                    "catalogue_share"] + [f"mat_{c}" for c in CATS] + [f"act_high_{c}" for c in CATS] + [f"act_revised_{c}" for c in CATS] \
+                    "catalogue_share"] + [f"mat_{c}" for c in CATS] + [f"act_high_{c}" for c in CATS] + [f"act_revised_{c}" for c in CATS] + [f"act_lm_{c}" for c in CATS] \
     + [f"cnt_{c}" for c in CATS]
 
 
@@ -232,7 +261,7 @@ def outcomes_b(d):
 
 
 ZVARS = ["breadth", "coverage", "linkage", "diversity", "cov_original", "cov_revised", "cov_high", "cov_revised_two",
-         "cov_high_resource", "breadth_t1", "breadth_t5", "mention_density", "breadth_specific", "interaction_share",
+         "cov_high_resource", "cov_lm", "breadth_t1", "breadth_t5", "mention_density", "breadth_specific", "interaction_share",
          "linked_pairs", "composition_change", "novelty", "breadth_industry_adj", "boilerplate_share", "breadth_nocat"]
 
 
@@ -292,19 +321,39 @@ for i, ix in enumerate(order):
     holm[ix] = run
 prin.loc[conf, "p_holm"] = pd.Series(holm)
 ex = prin[~conf & ~((prin["model"] == "H3") & (prin["term"] != "bxc"))].copy()
-ranked = ex["p"].rank(method="first")
-q = (ex["p"] * len(ex) / ranked)
-q = q.sort_values(ascending=False).cummin().reindex(ex.index).clip(upper=1)
-prin.loc[ex.index, "q_bh"] = q
+prin.loc[ex.index, "q_bh"] = bh(ex["p"].to_numpy())
 prin["effect_pct_per_sd"] = np.where(prin["outcome"].isin(["severity", "recovery", "rebound"]),
                                      100 * (np.exp(prin["coef"]) - 1), np.nan)
 prin["standardised"] = prin["coef"] / prin["sd_y"]
 prin.to_csv(RES / "Principal Models Full Inference.csv", index=False)
 OUT["principal"] = prin.to_dict(orient="records")
 
+# ------------------------------------------------------------------ 2b. placebo episode without a systemic shock
+def outcomes_placebo(d):
+    r18, r19 = (wide("ln_revenue", y).reindex(d.index) for y in (2018, 2019))
+    m18, m19 = (wide("op_margin", y).reindex(d.index) for y in (2018, 2019))
+    d["severity"] = r19 - r18
+    d["margin_change"] = m19 - m18
+    return d
+
+
+PL = prepare(outcomes_placebo(episode_frame(2017, 2018)), ["severity", "margin_change"])
+PL["bxc"] = PL["breadth_z"] * PL["coverage_z"]
+plc = []
+for y in ("severity", "margin_change"):
+    for h, (rhs, terms) in SPECS.items():
+        if h == "E1":
+            continue
+        res, dd = fit(PL, y, rhs + BASE, terms, wild=(y == "severity"), B=4999)
+        plc += [{"episode": "Placebo FY2018 to FY2019", "outcome": y, "model": h, **r} for r in res]
+plc = pd.DataFrame(plc)
+plc.to_csv(RES / "Placebo Episode.csv", index=False)
+OUT["placebo"] = plc.to_dict(orient="records")
+
 # ------------------------------------------------------------------ 3. response-measure variants (H2 and H3)
 VAR = {"Original rules": "cov_original", "Revised rules": "cov_revised", "High-confidence rules": "cov_high",
-       "Revised rules, two or more sentences": "cov_revised_two", "High-confidence with resource commitment": "cov_high_resource"}
+       "Revised rules, two or more sentences": "cov_revised_two", "High-confidence with resource commitment": "cov_high_resource",
+       "Language model (entailment at least 0.5)": "cov_lm"}
 rv = []
 for lab, d, outs in (("A", A, ["severity", "margin_change", "recovery"]), ("B", B, B_OUT)):
     for vname, v in VAR.items():
@@ -333,6 +382,10 @@ for lab, d, outs in (("A", A, ["severity", "margin_change", "recovery"]), ("B", 
             rv.append({"episode": lab, "outcome": y, "measure": "Any high-confidence response (indicator)", "model": "H3", **r,
                        "share_zero": float((d["any_high"] == 0).mean()), "mean": float(d["any_high"].mean())})
 rv = pd.DataFrame(rv)
+# Benjamini-Hochberg across every response and response-by-breadth term in this family
+fam = rv["term"].isin(["cv_z", "bxcv", "anyh", "bxanyh"]) & rv["p"].notna()
+rv.loc[fam, "q_bh"] = bh(rv.loc[fam, "p"].to_numpy())
+rv["family_size"] = int(fam.sum())
 rv.to_csv(RES / "Response Measure Variants.csv", index=False)
 OUT["response_variants"] = rv.to_dict(orient="records")
 
@@ -343,13 +396,14 @@ for lab, d, outs in (("A", A, ["severity", "margin_change", "recovery"]), ("B", 
         sub = d[d[f"mat_{c}"] == 1].copy()
         sub["resp"] = (sub[f"act_high_{c}"] > 0).astype(float)
         sub["resp_rev"] = (sub[f"act_revised_{c}"] > 0).astype(float)
+        sub["resp_lm"] = (sub[f"act_lm_{c}"] > 0).astype(float) if f"act_lm_{c}" in sub else 0.0
         for y in outs:
-            for rname in ("resp", "resp_rev"):
+            for rname in ("resp", "resp_rev", "resp_lm"):
                 if sub[rname].sum() < 15 or len(sub) < 80:
                     continue
                 r, _ = fit(sub, y, [rname] + BASE, [rname])
                 cat_rows.append({"episode": lab, "outcome": y, "category": c,
-                                 "rule": "high-confidence" if rname == "resp" else "revised",
+                                 "rule": {"resp": "high-confidence", "resp_rev": "revised", "resp_lm": "language model"}[rname],
                                  "firms_material": len(sub), "firms_responding": int(sub[rname].sum()), **r[0]})
 pd.DataFrame(cat_rows).to_csv(RES / "Category Response Models.csv", index=False)
 OUT["category_response"] = cat_rows
@@ -359,6 +413,8 @@ me = []
 grid = [0.0, 0.25, 0.5, 0.75, 1.0]
 for vname, v in VAR.items():
     d = A.copy()
+    if int((d[v] > 0).sum()) < 10:
+        continue
     mu, sdv = d[v].mean(), d[v].std()
     d["cv_z"] = d[v + "_z"]
     d["bxcv"] = d["breadth_z"] * d["cv_z"]
@@ -378,7 +434,8 @@ for vname, v in VAR.items():
             g_[1], g_[3] = 1, zc
             est, s = g_ @ beta, np.sqrt(g_ @ V @ g_)
             me.append({"measure": vname, "outcome": y, "coverage": cval, "effect": est, "se": s,
-                       "ci_low": est - 1.96 * s, "ci_high": est + 1.96 * s, "p": 2 * stats.norm.sf(abs(est / s)),
+                       "ci_low": est - stats.t.ppf(0.975, G - 1) * s, "ci_high": est + stats.t.ppf(0.975, G - 1) * s,
+                       "p": 2 * stats.t.sf(abs(est / s), G - 1),
                        "share_at_or_below": float((d[v] <= cval).mean())})
 pd.DataFrame(me).to_csv(RES / "Marginal Effects by Response Measure.csv", index=False)
 OUT["marginal_by_measure"] = me

@@ -1,0 +1,32 @@
+Variable,Category,Definition,Source,Timing
+cik,Identification,SEC Central Index Key,SEC EDGAR,Fixed
+fiscal_year,Identification,Fiscal year; years ending January to May are assigned to the previous calendar year,Derived from period of report,Annual
+sic2 / division,Firm characteristics,Two-digit SIC code and SIC division,SEC EDGAR submissions,Fixed
+breadth,Disclosed exposure,Number of the nine categories with at least three Item 1A sentences (primary convergence measure),Item 1A text; Analysis/text measures.py,Annual
+breadth_t1 / breadth_t5,Disclosed exposure,Breadth with materiality thresholds of one and five sentences,Item 1A text; Analysis/revision models.py,Annual
+breadth_specific,Disclosed exposure,Breadth counted only from sentences without a four-word sequence shared by 30 to 75 per cent of that year's filings (boilerplate-adjusted),Item 1A text; Analysis/build convergence measures.py,Annual
+breadth_nocat,Disclosed exposure,Breadth excluding hazard-catalogue sentences that list four or more categories,Item 1A text; Analysis/build convergence measures.py,Annual
+breadth_industry_adj,Disclosed exposure,Breadth minus the two-digit SIC mean in the same fiscal year,Derived,Annual
+mention_density,Disclosed exposure,Category sentences (summed over categories) divided by Item 1A sentences,Derived,Annual
+diversity,Disclosed exposure,Exponential of the Shannon entropy of the distribution of category sentences (effective number of categories),Analysis/text measures.py,Annual
+linkage,Disclosed exposure,Share of Item 1A sentences that name two or more categories,Analysis/text measures.py,Annual
+linked_pairs,Disclosed exposure,Number of distinct category pairs that co-occur in at least one Item 1A sentence,Datasets/Derived/Category Pairs.csv,Annual
+interaction_share,Disclosed exposure,"Share of Item 1A sentences that name two or three categories and state that one causes, worsens or compounds another",Analysis/build convergence measures.py,Annual
+composition_change,Disclosed exposure,One minus the Jaccard similarity of the material-category sets in consecutive years,Derived,Annual
+novelty,Disclosed exposure,Number of categories material this year but not in the previous year,Derived,Annual
+boilerplate_share,Disclosed exposure,Share of Item 1A words in sentences containing a four-word sequence shared by 30 to 75 per cent of that year's filings,Analysis/build convergence measures.py,Annual
+cnt_<category>,Disclosed exposure,Item 1A sentences assigned to the category by the revised dictionary,Analysis/text measures.py,Annual
+act_original_<category>,Documented response,Item 1 and Item 7 sentences flagged as a completed action on the category by the original rules,Analysis/build response measures.py,Annual
+act_revised_<category>,Documented response,Sentences flagged by the revised rules (first-version primary measure),Analysis/build response measures.py,Annual
+act_high_<category>,Documented response,"Sentences flagged by the high-confidence rules (Analysis/Response Rules High Confidence.json): explicit threat link, no future wording, no standing treasury instruments, no customer products",Analysis/build response measures.py,Annual
+act_high_resource_<category>,Documented response,"High-confidence sentences that also state a resource commitment (capital, capacity, sourcing or organisational change)",Analysis/build response measures.py,Annual
+act_lm_<category>,Documented response,Candidate sentences with entailment probability of at least 0.5 from the zero-shot model MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli (revision 6f5cf0a2) for the hypothesis that the company has already acted on the category,Data Collection/collection stages.py stage corpusnli,Annual
+cov_original / cov_revised / cov_high / cov_revised_two / cov_high_resource / cov_lm,Documented response,Response coverage: share of material categories with at least one flagged sentence under each rule (cov_revised_two requires two sentences),Analysis/revision models.py,Annual
+any_high,Documented response,1 if the firm-year has at least one high-confidence response sentence,Derived,Annual
+item1a_words / item1_words / item7_words,Reporting,"Word counts of Items 1A, 1 and 7",Analysis/text measures.py,Annual
+entail_implemented,Language-model score,Entailment probability for a sentence-category pair (Response Candidate Language Model Scores.csv.gz),Data Collection/collection stages.py,Pair
+stratum,Validation,"Rule stratum of a sentence-category pair: high, revised, original, near miss, other",Analysis/build response measures.py,Pair
+qualifies,Validation,"Reference label: 1 if category relevant, reactive or proactive action, explicit threat link and completed or ongoing (Validation/Response Coding Manual.md); assigned by an AI assistant, not human coders",Validation/Response Validation Reference Coding.csv,Pair
+cost_growth / sga_growth / inventory_growth,Realised sensitivity,"Log change in cost of revenue, SG&A and inventory from the previous fiscal year",SEC XBRL company facts; Analysis/revision models.py,Annual
+d_gross_margin / d_op_margin,Realised sensitivity,Change in gross margin and operating margin from the previous fiscal year,SEC XBRL company facts,Annual
+real_growth,Realised sensitivity,Log revenue growth deflated by the fiscal-year average of CPI-U (CUSR0000SA0),BLS; Analysis/revision models.py,Annual
