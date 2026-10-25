@@ -275,7 +275,8 @@ for lab, d, outs in (("A", A, ["severity", "margin_change", "recovery", "rebound
     d["bxc"] = d["breadth_z"] * d["coverage_z"]
     for y in outs:
         for h, (rhs, terms) in SPECS.items():
-            res, dd = fit(d, y, rhs + BASE, terms, wild=True, B=4999)
+            use_wild = (lab == "A" and y in ("severity", "recovery")) or (lab == "B" and y == "margin_change_two")
+            res, dd = fit(d, y, rhs + BASE, terms, wild=use_wild, B=4999)
             for r in res:
                 rows.append({"episode": lab, "outcome": y, "model": h, **r,
                              "family": "confirmatory" if (lab == "A" and y == "severity" and h in ("H1", "H2", "H3") and
@@ -589,9 +590,16 @@ pd.DataFrame(det).to_csv(RES / "Determinants of Breadth.csv", index=False)
 OUT["determinants"] = det
 
 # ------------------------------------------------------------------ 10. macro shock models
-cpi = pd.read_csv(PROJ / "Datasets" / "Raw Macro" / "Revision" / "Consumer Price Index All Urban Consumers.csv")
-cpi.columns = ["date", "cpi"]
-cpi["month"] = pd.PeriodIndex(pd.to_datetime(cpi["date"]), freq="M")
+RAWREV = PROJ / "Datasets" / "Raw Macro" / "Revision"
+bls = RAWREV / "Consumer Price Index All Urban Consumers Seasonally Adjusted BLS.csv"
+if bls.exists() and len(pd.read_csv(bls)) > 100:
+    cpi = pd.read_csv(bls)
+    cpi["month"] = pd.PeriodIndex.from_fields(year=cpi["year"], month=cpi["month"], freq="M")
+    cpi = cpi.rename(columns={"value": "cpi"})
+    OUT["cpi_source"] = "BLS CUSR0000SA0"
+else:
+    cpi = pd.DataFrame({"month": pd.period_range("2010-01", "2026-12", freq="M"), "cpi": np.nan})
+    OUT["cpi_source"] = "not available"
 cpi_fy = cpi.set_index("month")["cpi"].rolling(12).mean()
 macro = pd.read_csv(DER / "Macro Monthly.csv")
 macro["month"] = pd.PeriodIndex(macro["month"], freq="M")
@@ -615,7 +623,7 @@ S = P[P["fiscal_year"].between(2019, 2025)].copy()
 S = S.join(base18.add_suffix("_18"), on="cik")
 SHOCK = {"geopolitical": "gpr", "supply": "gscpi", "trade": "epu_trade", "regulatory": "epu_regulation", "macro": "epu_us"}
 for c in ["rev_growth", "d_op_margin", "real_growth", "cost_growth", "sga_growth", "d_gross_margin", "inventory_growth"]:
-    S[c] = winsor(S[c])
+    S[c] = winsor(S[c]) if S[c].notna().any() else S[c]
 
 
 def shock_fit(S, y, timing="fy", effects="year", cluster="firm", convergence=True):
@@ -654,7 +662,9 @@ def shock_fit(S, y, timing="fy", effects="year", cluster="firm", convergence=Tru
 
 
 sh = []
-for y in ["rev_growth", "d_op_margin", "real_growth", "cost_growth", "sga_growth", "d_gross_margin", "inventory_growth"]:
+OUTS_SHOCK = ["rev_growth", "d_op_margin", "cost_growth", "sga_growth", "d_gross_margin", "inventory_growth"] + \
+    (["real_growth"] if OUT["cpi_source"] != "not available" else [])
+for y in OUTS_SHOCK:
     for timing in ("fy", "point", "peak", "change"):
         if timing != "fy" and y not in ("rev_growth", "d_op_margin"):
             continue
