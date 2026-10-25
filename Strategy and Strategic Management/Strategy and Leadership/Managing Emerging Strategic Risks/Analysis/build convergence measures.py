@@ -102,6 +102,7 @@ def main(src: Path, out: Path):
         sents = fp.sentences(r["item1a"])
         words = boiler_words = 0
         spec = dict.fromkeys(CATS, 0)
+        nocat = dict.fromkeys(CATS, 0)
         n_inter = n_bp = 0
         for s in sents:
             toks = ids(s)
@@ -114,11 +115,15 @@ def main(src: Path, out: Path):
             else:
                 for c in cs:
                     spec[c] += 1
+            if len(cs) < tm.CATALOGUE:
+                for c in cs:
+                    nocat[c] += 1
             if 2 <= len(cs) < tm.CATALOGUE and INTERACTION.search(s):
                 n_inter += 1
         row = {"cik": cik, "fiscal_year": fy, "n_sent_1a": len(sents), "n_boilerplate_sentences": n_bp,
                "boilerplate_share": boiler_words / words if words else float("nan"), "n_interaction": n_inter}
         row.update({f"spec_{c}": spec[c] for c in CATS})
+        row.update({f"nocat_{c}": nocat[c] for c in CATS})
         rows.append(row)
     with open(out, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))

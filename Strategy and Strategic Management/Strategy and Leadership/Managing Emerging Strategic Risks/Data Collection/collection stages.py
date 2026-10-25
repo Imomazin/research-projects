@@ -565,5 +565,62 @@ def stage_revision(client, proj: Path, data: Path, log: list, **kw):
     log.append(f"revision searches: {len(wide)} terms; S&L records since 2024: {len(sl)}")
 
 
+# --------------------------------------------------------------------- contextual language model comparator
+
+NLI_MODEL = "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli"
+CAT_PHRASE = {"geopolitical": "geopolitical conflict or sanctions", "trade": "trade policy and tariffs",
+              "regulatory": "regulatory change", "cyber": "cybersecurity threats", "technology": "technological disruption",
+              "supply": "supply chain disruption", "climate": "climate and environmental risk",
+              "macro": "macroeconomic and financial instability", "pandemic": "the pandemic"}
+
+
+def stage_nli(client, proj: Path, data: Path, log: list, **kw):
+    """Zero-shot natural language inference scores for the response validation sample."""
+    import subprocess, sys
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "torch==2.5.1", "--index-url",
+                    "https://download.pytorch.org/whl/cpu"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "transformers==4.46.3", "sentencepiece==0.2.0",
+                    "protobuf==5.28.3"], check=True)
+    import torch
+    from huggingface_hub import model_info
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    info = model_info(NLI_MODEL)
+    tok = AutoTokenizer.from_pretrained(NLI_MODEL, revision=info.sha)
+    mod = AutoModelForSequenceClassification.from_pretrained(NLI_MODEL, revision=info.sha).eval()
+    labels = {v.lower(): k for k, v in mod.config.id2label.items()}
+    rows = list(csv.DictReader(open(proj / "Validation" / "Response Validation Sample.csv")))
+    out = []
+    hyps = {"implemented": "The company has already taken an action to reduce or manage its exposure to {}.",
+            "planned": "The company only plans or may take an action about {} in the future.",
+            "routine": "The sentence describes a routine business activity unrelated to {}."}
+    for r in rows:
+        rec = {"item_id": r["item_id"]}
+        for name, h in hyps.items():
+            enc = tok(r["sentence"][:2000], h.format(CAT_PHRASE[r["category"]]), return_tensors="pt", truncation=True, max_length=512)
+            with torch.no_grad():
+                pr = torch.softmax(mod(**enc).logits, dim=-1)[0]
+            rec[f"entail_{name}"] = round(float(pr[labels["entailment"]]), 4)
+        out.append(rec)
+    with open(proj / "Validation" / "Response Validation Language Model Scores.csv", "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(out[0].keys()))
+        w.writeheader()
+        w.writerows(out)
+    (proj / "Validation" / "Language Model Version.txt").write_text(
+        f"model {NLI_MODEL}\nrevision {info.sha}\ntorch 2.5.1 cpu; transformers 4.46.3\nrun {now()}\n")
+    log.append(f"nli scored {len(out)} items with {NLI_MODEL}@{info.sha}")
+
+
+def stage_convergence(client, proj: Path, data: Path, log: list, **kw):
+    """Run the second text pass for the alternative convergence measures on the data-branch texts."""
+    import subprocess, sys
+    out = proj / "Datasets" / "Derived" / "Revision"
+    out.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run([sys.executable, str(proj / "Analysis" / "build convergence measures.py"), str(data / "Filing Texts"),
+                        str(out / "Convergence Measures.csv")], capture_output=True, text=True)
+    log.append(r.stdout[-3000:])
+    if r.returncode:
+        raise RuntimeError(r.stderr[-3000:])
+
+
 STAGES = {"literature": stage_literature, "frame": stage_frame, "macro": stage_macro,
-          "filings": stage_filings, "facts": stage_facts, "revision": stage_revision}
+          "filings": stage_filings, "facts": stage_facts, "revision": stage_revision, "nli": stage_nli, "convergence": stage_convergence}
