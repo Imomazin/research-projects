@@ -659,5 +659,27 @@ def stage_prices(client, proj: Path, data: Path, log: list, **kw):
         w.writerows(man)
 
 
+def stage_references(client, proj: Path, data: Path, log: list, **kw):
+    """Crossref and OpenAlex records (with abstracts) for the revision candidate references only."""
+    lit = proj / "Literature"
+    recs = {}
+    for r in csv.DictReader(open(lit / "Revision Candidate References.csv")):
+        rec = {}
+        if r["doi"]:
+            body = client.get(f"https://api.crossref.org/works/{quote(r['doi'], safe='')}?mailto={MAILTO}", sec=False, use_cache=False)
+            rec["doi"], rec["message"] = r["doi"], (json.loads(body)["message"] if body else None)
+            oa = client.get(f"https://api.openalex.org/works/doi:{quote(r['doi'], safe='/')}?mailto={MAILTO}", sec=False, use_cache=False)
+            rec["openalex"] = json.loads(oa) if oa else None
+            time.sleep(0.5)
+        if r["title_query"]:
+            body = client.get("https://api.crossref.org/works?rows=5&mailto=" + MAILTO + "&query.bibliographic=" + quote(r["title_query"]),
+                              sec=False, use_cache=False)
+            rec["search"] = json.loads(body)["message"]["items"] if body else []
+            time.sleep(1.0)
+        recs[r["key"]] = rec
+    (lit / "Crossref Records" / "Revision Candidate Records.json").write_text(json.dumps(recs, indent=1))
+    log.append(f"candidate records {len(recs)}; doi hits {sum(1 for v in recs.values() if v.get('message'))}")
+
+
 STAGES = {"literature": stage_literature, "frame": stage_frame, "macro": stage_macro,
-          "filings": stage_filings, "facts": stage_facts, "revision": stage_revision, "nli": stage_nli, "convergence": stage_convergence, "prices": stage_prices}
+          "filings": stage_filings, "facts": stage_facts, "revision": stage_revision, "nli": stage_nli, "convergence": stage_convergence, "prices": stage_prices, "references": stage_references}
