@@ -52,7 +52,7 @@ def clean(t: str) -> str:
 
 
 def authors_from(m: dict, oa: dict | None) -> list[tuple[str, str]]:
-    out = [(a.get("family", ""), a.get("given", "")) for a in (m.get("author") or []) if a.get("family")]
+    out = [(a.get("family", "").replace(" Jr.", "").replace("\u2010", "-"), a.get("given", "")) for a in (m.get("author") or []) if a.get("family")]
     if not out and oa:
         for au in oa.get("authorships", []):
             name = au["author"]["display_name"].split()
@@ -61,7 +61,7 @@ def authors_from(m: dict, oa: dict | None) -> list[tuple[str, str]]:
 
 
 def fmt_authors(auths: list[tuple[str, str]]) -> str:
-    names = [f"{fix_case(fam)}, {initials(giv)}" for fam, giv in auths]
+    names = [f"{fix_case(fam).replace(chr(0x2010), '-')}, {initials(giv)}" for fam, giv in auths]
     if len(names) == 1:
         return names[0]
     return ", ".join(names[:-1]) + " and " + names[-1]
@@ -112,12 +112,13 @@ def entry(key: str) -> dict:
         series_txt = f"NBER Working Paper No. {num.group(1)}" if "10.3386" in doi and num else series
         text = f"{fmt_authors(auths)} ({yr}), \"{title}\", {series_txt}, doi: {doi}."
     surname_key = auths[0][0] if auths else ""
+    text = text.replace("\u2010", "-")
     return {"key": key, "verified": True, "text": text, "year": yr, "first_author": surname_key,
             "n_authors": len(auths), "doi": doi, "authors": [a[0] for a in auths]}
 
 
 def in_text(e: dict) -> str:
-    a = e["authors"]
+    a = [x.replace("\u2010", "-").replace(" Jr.", "") for x in e["authors"]]
     fix = fix_case
     if len(a) == 1:
         return f"{fix(a[0])}, {e['year']}"

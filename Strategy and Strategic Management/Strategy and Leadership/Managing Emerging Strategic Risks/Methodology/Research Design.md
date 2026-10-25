@@ -16,3 +16,7 @@ Lag predictors; firm and year fixed effects; clustered standard errors; alternat
 
 ## Validation
 Human-coded stratified disclosure sample, intercoder agreement, NLP calibration, temporal leakage prevention, out-of-sample tests and documented sensitivity analysis. All numeric results must be computed from archived data and scripts.
+
+## Design as executed (25 October 2026)
+
+The executed design, hypotheses, measures and decision rules are in Analysis/Analysis Plan.md, committed before outcomes were merged with text measures; its Deviations section dates every later change. Ambidexterity is retained as theory only because no reliable firm-level measure exists in these data. Research question 3 above was replaced by the response-coverage hypotheses (H2, H3). The firm-year unit, lagged predictors, firm and year fixed effects and exposure-by-shock interactions were implemented as planned; causal claims are not made.

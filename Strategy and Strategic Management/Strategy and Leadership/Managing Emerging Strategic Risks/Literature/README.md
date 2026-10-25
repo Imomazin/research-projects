@@ -1,3 +1,3 @@
 # Literature
 
-Store reference library, search protocol, inclusion decisions and evidence synthesis.
+Candidate References.csv lists every candidate work. Crossref Records/ holds the Crossref and OpenAlex records retrieved by the pipeline, the Strategy & Leadership corpus on risk, uncertainty, resilience and related themes, and searches for competing studies. Manual Verified References.json holds three entries verified against SEC pages and a university repository. Verified Bibliography.csv lists the 90 works cited in the manuscript with the source each was verified against. Literature Matrix.csv positions the closest studies. build references.py formats the list in Emerald Harvard style; references without a verified record are excluded automatically. One candidate DOI (recorded as Beatty, Cheng and Zhang, 2019) resolved to a different paper and was not cited.

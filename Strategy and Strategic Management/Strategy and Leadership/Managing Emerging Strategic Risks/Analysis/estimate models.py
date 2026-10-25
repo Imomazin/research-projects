@@ -19,8 +19,10 @@ from sklearn.metrics import roc_auc_score
 warnings.filterwarnings("ignore")
 HERE = Path(__file__).resolve().parent
 DER = HERE.parent / "Datasets" / "Derived"
-RES = HERE.parent / "Results"
-RES.mkdir(exist_ok=True)
+import os
+SUFFIX = os.environ.get("RESULTS_SUFFIX", "")
+RES = HERE.parent / "Results" / ("Alternative " + SUFFIX if SUFFIX else "")
+RES.mkdir(parents=True, exist_ok=True)
 CATS = list(json.loads((HERE / "Risk Taxonomy Dictionary.json").read_text())["categories"].keys())
 INTS = [f"int_{c}" for c in CATS]
 CONTROLS = ["ln_assets", "leverage", "cash_ratio", "roa", "prior_growth", "ln_item1a_words"]
@@ -47,7 +49,7 @@ def tidy(res, names, label):
 
 
 # ------------------------------------------------------------------ data
-P = pd.read_csv(DER / "Research Panel.csv", parse_dates=["fy_end", "filing_date"])
+P = pd.read_csv(DER / os.environ.get("PANEL_FILE", "Research Panel.csv"), parse_dates=["fy_end", "filing_date"])
 P = P.sort_values(["cik", "fiscal_year"])
 
 
@@ -157,8 +159,9 @@ episode = pd.DataFrame(rowsA + rowsB)
 episode.to_csv(RES / "Episode Models.csv", index=False)
 OUT["episode_meta"] = {**metaA, **metaB}
 OUT["episode_coefficients"] = episode.to_dict(orient="records")
-A.to_csv(DER / "Episode A Frame.csv")
-B.to_csv(DER / "Episode B Frame.csv")
+if not SUFFIX:
+    A.to_csv(DER / "Episode A Frame.csv")
+    B.to_csv(DER / "Episode B Frame.csv")
 
 # descriptive statistics for the episode samples
 desc = {}
@@ -172,6 +175,32 @@ corr_cols = ["severity", "margin_change", "recovery", "breadth", "coverage", "li
 corrA = A[corr_cols].corr()
 corrA.to_csv(RES / "Correlations Episode A.csv")
 OUT["correlations_A"] = corrA.round(4).to_dict()
+
+# ------------------------------------------------------------------ marginal effects of breadth by coverage
+me_rows = []
+for ep, D, y in [("A", A, "severity"), ("A", A, "recovery"), ("A", A, "recovered"), ("B", B, "margin_change")]:
+    rhs = ["breadth_z", "coverage_z", "breadth_z:coverage_z"] + INTS + CONTROLS
+    res, _, dd = ols(D, y, rhs, "me")
+    V = res.cov_params()
+    mu, sd = D["coverage"].mean(), D["coverage"].std()
+    for label, cov in [("no documented action (coverage 0)", 0.0),
+                       ("75th percentile", float(D["coverage"].quantile(0.75))),
+                       ("90th percentile", float(D["coverage"].quantile(0.90)))]:
+        cz = (cov - mu) / sd
+        est = res.params["breadth_z"] + cz * res.params["breadth_z:coverage_z"]
+        var = V.loc["breadth_z", "breadth_z"] + cz ** 2 * V.loc["breadth_z:coverage_z", "breadth_z:coverage_z"] \
+            + 2 * cz * V.loc["breadth_z", "breadth_z:coverage_z"]
+        se = float(np.sqrt(var))
+        from scipy import stats as _st
+        me_rows.append({"episode": ep, "outcome": y, "coverage_level": label, "coverage": cov, "effect": est, "se": se,
+                        "p": float(2 * (1 - _st.norm.cdf(abs(est / se)))), "ci_low": est - 1.96 * se, "ci_high": est + 1.96 * se})
+pd.DataFrame(me_rows).to_csv(RES / "Marginal Effects of Breadth.csv", index=False)
+OUT["marginal_effects"] = me_rows
+y18 = P[P["fiscal_year"] == 2018]
+OUT["coverage_fy2018"] = {"mean": float(y18["coverage"].mean()), "share_zero": float((y18["coverage"] == 0).mean()),
+                          "share_any_action": float(y18["any_action"].mean()),
+                          "action_sentences_by_category": {c: int(y18[f"act_{c}"].sum()) for c in CATS},
+                          "firms_with_action_by_category": {c: int((y18[f"act_{c}"] > 0).sum()) for c in CATS}}
 
 # ------------------------------------------------------------------ robustness grid
 ROB = []
@@ -299,6 +328,19 @@ for y in ["rev_growth", "d_op_margin"]:
             inter_rows.append({"model": key, "term": t, "coef": r.params[t], "se": r.std_errors[t], "p": r.pvalues[t],
                                "ci_low": ci.iloc[0], "ci_high": ci.iloc[1]})
         inter_meta[key] = {"n": int(r.nobs), "firms": int(dd.index.get_level_values(0).nunique())}
+S["sic2_year"] = S["sic2"].astype(int).astype(str) + "_" + S["fiscal_year"].astype(str)
+for y in ["rev_growth", "d_op_margin"]:
+    rhs = xs + ["x_breadth_shocks"]
+    dd = S.dropna(subset=[y] + rhs).copy()
+    dd["sic2_year"] = pd.Categorical(dd["sic2_year"])
+    dd = dd.set_index(["cik", "fiscal_year"])
+    r = PanelOLS(dd[y], dd[rhs], entity_effects=True, other_effects=dd[["sic2_year"]]).fit(cov_type="clustered", cluster_entity=True)
+    key = f"Shock|Industry-by-year effects|{y}"
+    for t in rhs:
+        ci = r.conf_int().loc[t]
+        inter_rows.append({"model": key, "term": t, "coef": r.params[t], "se": r.std_errors[t], "p": r.pvalues[t],
+                           "ci_low": ci.iloc[0], "ci_high": ci.iloc[1]})
+    inter_meta[key] = {"n": int(r.nobs), "firms": int(dd.index.get_level_values(0).nunique())}
 pd.DataFrame(inter_rows).to_csv(RES / "Shock Exposure Models.csv", index=False)
 OUT["shock_coefficients"] = inter_rows
 OUT["shock_meta"] = inter_meta

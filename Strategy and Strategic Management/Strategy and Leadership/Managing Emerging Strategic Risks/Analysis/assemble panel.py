@@ -66,7 +66,9 @@ def fiscal_macro(panel: pd.DataFrame, macro: pd.DataFrame) -> pd.DataFrame:
 
 
 def main():
-    text = pd.read_csv(DER / "Text Measures.csv")
+    import os
+    text = pd.read_csv(DER / os.environ.get("TEXT_FILE", "Text Measures.csv"))
+    panel_name = os.environ.get("PANEL_FILE", "Research Panel.csv")
     fin = pd.read_csv(DER / "Financial Panel.csv", parse_dates=["fy_end"])
     firms = pd.read_csv(HERE.parent / "Datasets" / "Sampling Frame" / "Sample Firms.csv")
     macro = pd.read_csv(DER / "Macro Monthly.csv")
@@ -109,7 +111,7 @@ def main():
     p["fye_month"] = p["fy_end"].dt.month
     p["filing_date"] = pd.to_datetime(p["filing_date"])
     p = fiscal_macro(p, macro)
-    p.to_csv(DER / "Research Panel.csv", index=False)
+    p.to_csv(DER / panel_name, index=False)
     cov = p.groupby("fiscal_year").agg(firms=("cik", "nunique"), revenue=("revenue", "count"),
                                        item1a=("n_sent_1a", "count"), op_margin=("op_margin", "count"),
                                        response=("n_sent_response", "count"))
