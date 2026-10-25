@@ -627,31 +627,66 @@ BLS_SERIES = {"CUSR0000SA0": "Consumer Price Index All Urban Consumers Seasonall
 
 
 def stage_prices(client, proj: Path, data: Path, log: list, **kw):
-    """Price indices from the Bureau of Labor Statistics public API (FRED timed out from the runner)."""
+    """Monthly price indices with fallbacks: BLS API v2 (GET), BLS API v1 (POST), BLS flat files, FRED.
+    Every attempt is logged with its HTTP status and the first bytes of the response."""
     import hashlib
+    import io
     import requests
     out = proj / "Datasets" / "Raw Macro" / "Revision"
     out.mkdir(parents=True, exist_ok=True)
+    ua = {"User-Agent": "Mozilla/5.0 (research; Imo Enang; " + MAILTO + ")", "Accept": "*/*"}
+    fred = {"CUSR0000SA0": "CPIAUCSL", "WPSFD4": "PPIFIS"}
+    flat = {"CUSR0000SA0": "https://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems",
+            "WPSFD4": "https://download.bls.gov/pub/time.series/wp/wp.data.0.Current"}
     man = []
     for sid, name in BLS_SERIES.items():
-        rows = []
-        for a, b in ((2012, 2020), (2021, 2026)):
-            r = requests.post("https://api.bls.gov/publicAPI/v1/timeseries/data/",
-                              json={"seriesid": [sid], "startyear": str(a), "endyear": str(b)},
-                              headers={"User-Agent": "Imo Enang strategic risk research " + MAILTO}, timeout=90)
-            js = r.json()
-            log.append(f"BLS {sid} {a}-{b}: {js.get('status')} {js.get('message')}")
-            for d in js.get("Results", {}).get("series", [{}])[0].get("data", []):
-                if d["period"].startswith("M") and d["period"] != "M13":
-                    rows.append({"year": int(d["year"]), "month": int(d["period"][1:]), "value": float(d["value"])})
-            time.sleep(3)
+        rows, source = [], ""
+        attempts = []
+        try:
+            for a, b in ((2012, 2020), (2021, 2026)):
+                r = requests.get(f"https://api.bls.gov/publicAPI/v2/timeseries/data/{sid}?startyear={a}&endyear={b}", headers=ua, timeout=90)
+                attempts.append(f"BLS v2 {a}-{b}: HTTP {r.status_code} {r.text[:120]!r}")
+                js = r.json()
+                for d in js.get("Results", {}).get("series", [{}])[0].get("data", []):
+                    if d["period"].startswith("M") and d["period"] != "M13":
+                        rows.append({"year": int(d["year"]), "month": int(d["period"][1:]), "value": float(d["value"])})
+                time.sleep(3)
+            source = f"https://api.bls.gov/publicAPI/v2/timeseries/data/{sid}"
+        except Exception as exc:
+            attempts.append(f"BLS v2 error {type(exc).__name__}")
+            rows = []
+        if not rows:
+            try:
+                r = requests.get(flat[sid], headers=ua, timeout=180)
+                attempts.append(f"BLS flat file: HTTP {r.status_code} {r.text[:120]!r}")
+                for line in r.text.splitlines()[1:]:
+                    parts = [x.strip() for x in line.split("\t")]
+                    if len(parts) >= 4 and parts[0] == sid and parts[2].startswith("M") and parts[2] != "M13" and int(parts[1]) >= 2012:
+                        rows.append({"year": int(parts[1]), "month": int(parts[2][1:]), "value": float(parts[3])})
+                source = flat[sid] if rows else ""
+            except Exception as exc:
+                attempts.append(f"BLS flat error {type(exc).__name__}")
+        if not rows:
+            try:
+                r = requests.get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={fred[sid]}", headers=ua, timeout=240)
+                attempts.append(f"FRED: HTTP {r.status_code} {r.text[:80]!r}")
+                import pandas as pd
+                df = pd.read_csv(io.StringIO(r.text))
+                df.columns = ["date", "value"]
+                df["date"] = pd.to_datetime(df["date"])
+                df = df[df["date"].dt.year >= 2012]
+                rows = [{"year": d.year, "month": d.month, "value": float(v)} for d, v in zip(df["date"], df["value"])]
+                source = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={fred[sid]}" if rows else ""
+            except Exception as exc:
+                attempts.append(f"FRED error {type(exc).__name__}")
+        log.extend(f"{sid} {x}" for x in attempts)
         rows.sort(key=lambda x: (x["year"], x["month"]))
         with open(out / name, "w", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=["year", "month", "value"])
             w.writeheader()
             w.writerows(rows)
         body = (out / name).read_bytes()
-        man.append({"file": name, "url": f"https://api.bls.gov/publicAPI/v1/timeseries/data/ series {sid}", "status": "downloaded" if rows else "failed",
+        man.append({"file": name, "series": sid, "url": source, "status": "downloaded" if rows else "failed",
                     "bytes": len(body), "sha256": hashlib.sha256(body).hexdigest(), "retrieved": now(), "rows": len(rows)})
     with open(out / "Price Index Retrieval Manifest.csv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(man[0].keys()))
