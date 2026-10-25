@@ -69,6 +69,8 @@ def main():
     firms = pd.read_csv(HERE.parent / "Datasets" / "Sampling Frame" / "Sample Firms.csv")
     macro = pd.read_csv(DER / "Macro Monthly.csv")
     text = text_variables(text)
+    excl = pd.read_csv(HERE.parent / "Datasets" / "Sampling Frame" / "Frame Validation Exclusions.csv")
+    firms = firms[~firms["cik"].isin(excl["cik"])]
     firms = firms[["cik", "name", "sic", "division", "state_incorporation", "sampling_weight", "float"]]
     firms["sic2"] = (firms["sic"] // 100).astype(int)
     firms["us_incorporated"] = firms["state_incorporation"].astype(str).str.match(r"^[A-Z]{2}$").astype(int)
@@ -80,7 +82,11 @@ def main():
     p["leverage"] = p["liabilities"] / p["assets"]
     p["cash_ratio"] = p["cash"] / p["assets"]
     p["roa"] = p["net_income"] / p["assets"]
-    p["op_margin"] = p["operating_income"] / p["revenue"].where(p["revenue"] > 0)
+    fallback = p["revenue"] - p["costs_and_expenses"]
+    p["op_income_source"] = np.where(p["operating_income"].notna(), "OperatingIncomeLoss",
+                                     np.where(fallback.notna(), "revenue less costs and expenses", ""))
+    p["op_income"] = p["operating_income"].fillna(fallback)
+    p["op_margin"] = p["op_income"] / p["revenue"].where(p["revenue"] > 0)
     p["ln_revenue"] = np.log(p["revenue"].where(p["revenue"] > 0))
     lag = lambda col, k=1: g[col].shift(k).where(g["fiscal_year"].shift(k) == p["fiscal_year"] - k)
     p["rev_growth"] = p["ln_revenue"] - lag("ln_revenue")

@@ -96,11 +96,27 @@ def pick(facts: pd.DataFrame, concepts: list[str], ends: pd.DataFrame, flow: boo
     return out
 
 
+def revenue_max(f: pd.DataFrame, ends: pd.DataFrame) -> pd.DataFrame:
+    """Total revenue: the largest of the revenue concepts reported for the fiscal year.
+    Some filers tag only part of revenue with the ASC 606 contract-revenue concept
+    (for example revenue outside the scope of ASC 606), so the largest concept is the
+    closest match to reported total revenue. First-reported and latest values are kept."""
+    sub = f[f["concept"].isin(REVENUE_ORDER) & f["is_flow"]].merge(ends, on=["cik", "fiscal_year"])
+    sub = sub[(sub["end"] - sub["fy_end"]).dt.days.abs() <= 7]
+    first = sub.sort_values("filed").groupby(["cik", "fiscal_year", "concept"]).head(1)
+    last = sub.sort_values("filed").groupby(["cik", "fiscal_year", "concept"]).tail(1)
+    fmax = first.sort_values("val").groupby(["cik", "fiscal_year"]).tail(1)
+    out = fmax[["cik", "fiscal_year", "val", "concept", "filed", "accn"]].rename(
+        columns={"val": "revenue", "concept": "revenue_concept", "filed": "revenue_filed", "accn": "revenue_accn"})
+    lmax = last.groupby(["cik", "fiscal_year"])["val"].max().rename("revenue_latest").reset_index()
+    return out.merge(lmax, on=["cik", "fiscal_year"], how="left")
+
+
 def build(facts: pd.DataFrame) -> pd.DataFrame:
     f = annual_facts(facts)
     ends = fiscal_year_ends(f)
     panel = ends.copy()
-    rev = pick(f, REVENUE_ORDER, ends, True, "revenue")
+    rev = revenue_max(f, ends)
     panel = panel.merge(rev, on=["cik", "fiscal_year"], how="left")
     for name, cs in FLOWS.items():
         p = pick(f, cs, ends, True, name)[["cik", "fiscal_year", name, f"{name}_latest"]]
@@ -114,7 +130,9 @@ def build(facts: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    facts = pd.read_csv(sys.argv[1], dtype={"cik": int})
+    facts = pd.read_csv(sys.argv[1], dtype={"cik": int}, low_memory=False)
+    facts = facts[pd.to_numeric(facts["val"], errors="coerce").notna()]
+    facts["val"] = facts["val"].astype(float)
     out = build(facts)
     out.to_csv(sys.argv[2], index=False)
     print(out.shape)
