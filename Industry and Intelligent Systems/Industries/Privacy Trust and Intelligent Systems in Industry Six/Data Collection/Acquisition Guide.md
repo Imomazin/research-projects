@@ -27,3 +27,18 @@ SWaT: https://www.sutd.edu.sg/itrust/itrust-labs/datasets/terms-of-usage/ ; requ
 ## Integrity and research validity
 
 Log download time, SHA-256, schema, licensing, event chronology and machine/client identity. A registry entry is not a downloaded dataset. Large files remain outside regular Git history until separately acquired in a compliant data store. Do not treat arbitrary simulated data splits as actual federation across industrial plants.
+
+## Bosch CNC measured vibration data and machine-based federation
+
+Original repository: https://github.com/boschresearch/CNC_Machining
+
+The original data are sampled at 2 kHz across three physical CNC machines, fifteen operations and annotated normal/abnormal processes. Dataset: CC BY 4.0; companion utility code: BSD-3-Clause. Cite Tnani, Feil and Diepold, "Smart Data Collection System for Brownfield CNC Milling Machines", https://doi.org/10.1016/j.procir.2022.04.022.
+
+Retrieve the original repository with `git clone https://github.com/boschresearch/CNC_Machining`, preserve the exact upstream commit SHA and run:
+
+    python -m pip install "numpy>=1.26,<3" "pandas>=2,<3" "scipy>=1.12,<2" "h5py>=3.11,<4"
+    python "Data Collection/Prepare Bosch CNC Features.py" --data-root "/path/to/CNC_Machining/data" --output-dir "Local Data"
+
+The derived feature table retains machine, operation, label, timeframe, source SHA and non-identifying sensor statistics. Raw HDF5 recordings stay in the original external source. A source file is an observed recording from a known machine, but not evidence of distinct companies.
+
+Recommended external validity: leave one machine out for cross-machine evaluation; where feasible reserve an entire later timeframe for temporal testing. Group repeated process recordings to avoid adjacent-window leakage. Any training on single-source AI4I, SECOM, steel, power or gas turbine data must be described as simulated federation. Do not present dataset-size or machine-count increases as evidence of real multinational collaborative learning.
