@@ -1,0 +1,33 @@
+name: Acquire gas turbine source data
+on:
+  push:
+    paths:
+      - "Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six/Data Collection/Acquire Gas Turbine.py"
+      - ".github/workflows/gas-turbine-source.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  acquire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install audit dependencies
+        run: pip install "pandas>=2,<3"
+      - name: Download and independently validate authoritative dataset
+        run: python "Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six/Data Collection/Acquire Gas Turbine.py"
+      - name: Commit verified CC BY dataset with audit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six/Datasets/Gas Turbine Annual Records"
+          if ! git diff --cached --quiet; then
+            git commit -m "Add audited UCI gas turbine annual emissions data"
+            git push
+          fi
