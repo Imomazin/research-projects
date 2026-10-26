@@ -40,3 +40,19 @@ The gas-turbine task predicts NOx emissions from nine contemporaneous non-emissi
 ## Intrusion-security transfer pilot
 
 The IoT task uses original UCI 942 RT-IoT2022 archived data (123,117 network-flow observations) as a separate security transfer benchmark. Benign traffic is the three original categories Thing_Speak, MQTT_Publish and Wipro_bulb; the other nine original labels are treated as attacks. The original multiclass labels remain preserved in the archive and provenance audit. The unrelated Unnamed row identifier is excluded, as are the target label and any explicit one-to-one target encodings. Categorical protocols and service values are one-hot encoded before train-only preprocessing. The pilot uses simulated non-IID clients; IoT testbed traffic is not field evidence from independent industrial factories. Interpret security results with class imbalance and potential correlated traffic flows in mind. Future assessments should use attack-family and device holdouts when authenticated identifiers are available.
+
+## Repeated paired experiments
+
+Execute the provided multi-seed runner with full datasets and a preregistered grid:
+
+    python "Experiments/Run Paired Benchmarks.py" --datasets maintenance steel semiconductor power gas iot --seeds 11 23 37 47 59 --alphas 0.1 0.5 2.0 --noises 0.8 1.2 2.0 --rounds 8 --clients 4 --max-rows 0
+
+Paths above are relative to the Industry Six paper folder. The default research grid is computationally substantial and needs sufficient run time. Each combination archives an individual JSON output; the runner records every failed job in a separate file and generates Trial Metrics.csv and Seed Summary.csv (names in GitHub are spelled with spaces). Confidence intervals describe variability across repeated random seeds only and are not external-validation intervals.
+
+The automated paired pilot currently runs maintenance and steel with three matched seeds, two simulated clients, two rounds and 800 samples per task to validate the pipeline. This is not the definitive research sample or the full grid.
+
+Every model family must be assessed on the same prespecified task. Different epsilon budgets are distinct privacy conditions; do not imply that unequal privacy budgets or training costs yield a causal method improvement. Do not rank configurations using the reserved test set. Any decisions driven by validation findings require an untouched final evaluation protocol.
+
+## Existing pilot evidence
+
+See Pilot Evidence.md for six GitHub Actions smoke-test results, including unsuccessful method outcomes and class-imbalance failures. Test statistics should not be quoted as representative industrial field performance.
