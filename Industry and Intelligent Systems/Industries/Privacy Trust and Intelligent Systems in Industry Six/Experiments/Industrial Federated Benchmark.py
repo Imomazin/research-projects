@@ -31,6 +31,7 @@ DATA = ROOT / "Datasets"
 
 
 def load_data(name):
+    periods = None
     if name == "maintenance":
         path = DATA / "Manufacturing Maintenance.csv"
         frame = pd.read_csv(path)
@@ -72,6 +73,35 @@ def load_data(name):
         X, y = frame.drop(columns=["PE"]), frame["PE"].astype(float).to_numpy()
         source_files = [path]
         task = "regression"
+    elif name == "gas":
+        folder = DATA / "Gas Turbine Annual Records"
+        files = [
+            ("2011", "Gas Turbine First Year.csv"),
+            ("2012", "Gas Turbine Second Year.csv"),
+            ("2013", "Gas Turbine Third Year.csv"),
+            ("2014", "Gas Turbine Fourth Year.csv"),
+            ("2015", "Gas Turbine Fifth Year.csv"),
+        ]
+        annual = []
+        year_labels = []
+        source_files = []
+        for year, name in files:
+            path = folder / name
+            data = pd.read_csv(path)
+            expected = {"AT", "AP", "AH", "AFDP", "GTEP", "TIT", "TAT", "TEY", "CDP", "CO", "NOX"}
+            if set(data.columns) != expected:
+                raise ValueError(f"Invalid gas-turbine annual schema for {year}")
+            annual.append(data)
+            year_labels.extend([int(year)] * len(data))
+            source_files.append(path)
+        frame = pd.concat(annual, ignore_index=True)
+        if len(frame) != 36733:
+            raise ValueError("Incomplete gas-turbine annual source files")
+        # All nine non-emissions sensors; exclude both targets from features.
+        y = frame["NOX"].astype(float).to_numpy()
+        X = frame.drop(columns=["NOX", "CO"])
+        task = "regression"
+        periods = np.asarray(year_labels, dtype=int)
     else:
         raise ValueError(f"Unknown dataset: {name}")
     X = X.apply(pd.to_numeric, errors="coerce")
@@ -80,21 +110,40 @@ def load_data(name):
     if len(X) != len(y) or len(X) < 100 or X.shape[1] < 2:
         raise ValueError("Invalid dataset dimensions")
     hashes = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in source_files}
-    return X, np.asarray(y), task, hashes
+    return X, np.asarray(y), task, hashes, periods
 
 
-def split_and_prepare(X, y, task, seed, max_rows):
+def split_and_prepare(X, y, task, seed, max_rows, periods=None):
     rng = np.random.default_rng(seed)
     all_index = np.arange(len(y))
-    if max_rows and max_rows < len(y):
-        strat = y if task == "classification" else None
-        chosen, _ = train_test_split(all_index, train_size=max_rows, random_state=seed, stratify=strat)
-        all_index = np.sort(chosen)
-    strat = y[all_index] if task == "classification" else None
-    fit, test = train_test_split(all_index, test_size=0.15, random_state=seed, stratify=strat)
-    strat_fit = y[fit] if task == "classification" else None
-    train, valid = train_test_split(fit, test_size=0.15 / 0.85, random_state=seed + 1,
-                                   stratify=strat_fit)
+    if periods is not None:
+        # Year-based train 2011-2013, validation 2014, unseen final-year test 2015.
+        train = all_index[np.isin(periods, [2011, 2012, 2013])]
+        valid = all_index[periods == 2014]
+        test = all_index[periods == 2015]
+        if min(map(len, [train, valid, test])) < 1:
+            raise ValueError("Missing a required gas turbine year")
+        if max_rows and max_rows < len(y):
+            shares = [max_rows * len(v) / len(y) for v in (train, valid, test)]
+            sizes = [max(1, int(s)) for s in shares]
+            while sum(sizes) > max_rows:
+                sizes[int(np.argmax(sizes))] -= 1
+            train, valid, test = [
+                np.sort(rng.choice(idx, size=min(count, len(idx)), replace=False))
+                for idx, count in zip((train, valid, test), sizes)
+            ]
+    else:
+        if max_rows and max_rows < len(y):
+            strat = y if task == "classification" else None
+            chosen, _ = train_test_split(all_index, train_size=max_rows,
+                                         random_state=seed, stratify=strat)
+            all_index = np.sort(chosen)
+        strat = y[all_index] if task == "classification" else None
+        fit, test = train_test_split(all_index, test_size=0.15,
+                                      random_state=seed, stratify=strat)
+        strat_fit = y[fit] if task == "classification" else None
+        train, valid = train_test_split(fit, test_size=0.15 / 0.85,
+                                        random_state=seed + 1, stratify=strat_fit)
     assert not (set(train) & set(test) or set(train) & set(valid) or set(test) & set(valid))
     imputer = SimpleImputer(strategy="median")
     scaler = StandardScaler()
@@ -113,6 +162,7 @@ def split_and_prepare(X, y, task, seed, max_rows):
     return (x_train, x_valid, x_test), tuple(targets), normalisation, {
         "training_rows": len(train), "validation_rows": len(valid), "test_rows": len(test),
         "seed": seed, "partition_scope": "single dataset with simulated clients",
+        "temporal_holdout_by_year": bool(periods is not None),
         "train_index_sha256": hashlib.sha256(np.sort(train).astype("int64").tobytes()).hexdigest(),
         "test_index_sha256": hashlib.sha256(np.sort(test).astype("int64").tobytes()).hexdigest(),
     }
@@ -251,8 +301,8 @@ def evaluate(model, x, y, task, normalisation):
         original = y * normalisation["std"] + normalisation["mean"]
         predicted = scores.reshape(-1) * normalisation["std"] + normalisation["mean"]
         return {
-            "mae_mw": float(mean_absolute_error(original, predicted)),
-            "rmse_mw": float(np.sqrt(mean_squared_error(original, predicted))),
+            "mae_" + normalisation["unit"]: float(mean_absolute_error(original, predicted)),
+            "rmse_" + normalisation["unit"]: float(np.sqrt(mean_squared_error(original, predicted))),
         }
     scores = scores - scores.max(axis=1, keepdims=True)
     probabilities = np.exp(scores) / np.exp(scores).sum(axis=1, keepdims=True)
@@ -276,10 +326,12 @@ def execute(opts):
     np.random.seed(opts.seed)
     torch.manual_seed(opts.seed)
     torch.set_num_threads(max(1, min(4, torch.get_num_threads())))
-    X, y, task, hashes = load_data(opts.dataset)
+    X, y, task, hashes, periods = load_data(opts.dataset)
     prepared, targets, normalisation, split = split_and_prepare(
-        X, y, task, opts.seed, opts.max_rows
+        X, y, task, opts.seed, opts.max_rows, periods=periods
     )
+    if normalisation is not None:
+        normalisation["unit"] = "mw" if opts.dataset == "power" else "mg_per_cubic_metre"
     xtr, xva, xte = prepared
     ytr, yva, yte = targets
     parts, partition_attempts = client_partitions(ytr, task, opts.clients, opts.alpha, opts.seed)
@@ -301,8 +353,8 @@ def execute(opts):
         def classical_metric(x, y_eval):
             actual = y_eval * normalisation["std"] + normalisation["mean"]
             pred = simple.predict(x) * normalisation["std"] + normalisation["mean"]
-            return {"mae_mw": float(mean_absolute_error(actual, pred)),
-                    "rmse_mw": float(np.sqrt(mean_squared_error(actual, pred)))}
+            return {"mae_" + normalisation["unit"]: float(mean_absolute_error(actual, pred)),
+                    "rmse_" + normalisation["unit"]: float(np.sqrt(mean_squared_error(actual, pred)))}
     pooled = pooled_network(xtr, ytr, task, n_classes, opts)
     nonprivate, fedinfo = federate(xtr, ytr, task, n_classes, parts, opts, private=False)
     private, dpinfo = federate(xtr, ytr, task, n_classes, parts, opts, private=True)
@@ -351,7 +403,7 @@ def execute(opts):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", choices=["maintenance", "steel", "semiconductor", "power"],
+    parser.add_argument("--dataset", choices=["maintenance", "steel", "semiconductor", "power", "gas"],
                         default="maintenance")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--clients", type=int, default=4)

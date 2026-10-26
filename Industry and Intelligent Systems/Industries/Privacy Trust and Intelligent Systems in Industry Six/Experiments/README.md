@@ -32,3 +32,7 @@ Quick code-level pilot: add --max-rows 500 --rounds 1 --clients 2.
 ## Next empirical work
 
 Benchmark alpha 0.1, 0.5, 2.0; client participation 0.5, 0.75, 1.0; Gaussian noise 0.8, 1.2, 2.0; 5 or more paired seeds. Record utility-versus-epsilon frontiers, privacy attack advantage, device-held-out performance, cost and uncertainty. Run observational baselines on Bosch CNC machine-labelled records when authoritative dataset files are acquired. Validate the novel contribution independently against current published methods before claiming methodological superiority.
+
+## Gas turbine annual holdout
+
+The gas-turbine task predicts NOx emissions from nine contemporaneous non-emission sensor variables, excluding CO and NOx from predictors. All 2011–2013 records form training, 2014 is validation and 2015 is a never-seen testing period. The 500-row CI pilot proportionally samples within each period without crossing year boundaries. Federated client labels remain simulated partitions drawn only from the training period; a year is not an independent factory. Metrics are expressed in mg per cubic metre. A successful CI run is a computational smoke test only.
