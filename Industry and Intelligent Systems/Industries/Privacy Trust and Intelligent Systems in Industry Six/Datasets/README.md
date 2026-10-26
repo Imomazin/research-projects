@@ -17,3 +17,11 @@ Steel Plates Faults has 1,941 observed quality records. The mirrored CSV recodes
 The larger Bosch, HAI, TON IoT, CIC IoT, Edge IIoTset, N BaIoT and NASA holdings require source-specific download procedures. SWaT cannot be redistributed under iTrust's dataset conditions; obtain separate authorised access.
 
 Every dataset included in an experiment must have an acquisition date, immutable source/version, SHA-256 checksum, licence, measurement schema, cohort definition, split file and preprocessing code.
+
+## Combined Cycle Power Plant (added 26 October 2026)
+
+Original: UCI repository dataset 294, DOI 10.24432/C5002N; CC BY 4.0. Original researchers Pınar Tüfekci and Heysem Kaya. The dataset contains 9,568 observed hourly power-plant performance records with four predictors (AT, V, AP, RH) and continuous target PE (MW). The committed CSV is taken from the public mirror https://github.com/YungChunLu/UCI-Power-Plant/blob/master/data.csv; line endings were converted to LF without changing field values. Integrity checked: 9,568 rows, five columns, all numerical, PE ranges 420.26–495.76. The source provided shuffled observations; dates and facility IDs are unavailable. Use regression-specific evaluation and simulated clients only; never describe the records as independent industrial sites or naturally chronological partitions.
+
+## Gas Turbine Emissions (registered 26 October 2026)
+
+UCI dataset 551, DOI 10.24432/C5WC95, CC BY 4.0, includes 36,733 observed hourly turbine measurements in five annual CSV files. Download via UCI with the supplied downloader. The source describes chronology within original year files, but no independent industrial clients. Model targets CO or NOx separately, excluding other outcome targets as appropriate to each prediction question. Raw files have not yet been committed.
