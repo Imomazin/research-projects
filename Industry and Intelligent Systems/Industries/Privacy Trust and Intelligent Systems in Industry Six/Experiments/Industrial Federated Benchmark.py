@@ -14,6 +14,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+import io
+import zipfile
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import (
@@ -102,9 +104,28 @@ def load_data(name):
         X = frame.drop(columns=["NOX", "CO"])
         task = "regression"
         periods = np.asarray(year_labels, dtype=int)
+    elif name == "iot":
+        archive_path = DATA / "IoT Intrusion Source" / "Real Time IoT Traffic.zip"
+        with zipfile.ZipFile(archive_path) as source:
+            candidates = [s for s in source.namelist() if Path(s).name == "RT_IOT2022"]
+            if len(candidates) != 1:
+                raise ValueError("Original IoT traffic table absent from archive")
+            frame = pd.read_csv(io.BytesIO(source.read(candidates[0])), low_memory=False)
+        if len(frame) != 123117 or "Attack_type" not in frame:
+            raise ValueError("Unverified IoT source table")
+        normal = {"Thing_Speak", "MQTT_Publish", "Wipro_bulb"}
+        observed = set(frame["Attack_type"].dropna().unique())
+        if not normal.issubset(observed) or len(observed) != 12:
+            raise ValueError("Unknown IoT attack and benign label mapping")
+        y = (~frame["Attack_type"].isin(normal)).astype(int).to_numpy()
+        X = frame.drop(columns=["Attack_type", "Unnamed: 0"], errors="ignore")
+        cat = [c for c in ["proto", "service"] if c in X.columns]
+        X = pd.get_dummies(X, columns=cat, dummy_na=True, dtype=int)
+        source_files = [archive_path]
+        task = "classification"
     else:
         raise ValueError(f"Unknown dataset: {name}")
-    X = X.apply(pd.to_numeric, errors="coerce")
+    X = X.apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan)
     if X.isna().all(axis=0).any():
         X = X.loc[:, ~X.isna().all(axis=0)]
     if len(X) != len(y) or len(X) < 100 or X.shape[1] < 2:
@@ -403,7 +424,7 @@ def execute(opts):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", choices=["maintenance", "steel", "semiconductor", "power", "gas"],
+    parser.add_argument("--dataset", choices=["maintenance", "steel", "semiconductor", "power", "gas", "iot"],
                         default="maintenance")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--clients", type=int, default=4)
