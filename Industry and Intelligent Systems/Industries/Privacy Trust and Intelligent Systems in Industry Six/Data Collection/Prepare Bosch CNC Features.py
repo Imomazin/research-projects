@@ -93,7 +93,7 @@ def main():
     frame = pd.DataFrame.from_records(records)
     if frame["Source File"].duplicated().any():
         raise ValueError("Duplicate source observations")
-    if (frame["Anomaly"] == (frame["Condition"] == "bad").astype(int)).all() is False:
+    if not bool((frame["Anomaly"] == (frame["Condition"] == "bad").astype(int)).all()):
         raise ValueError("Label inconsistency")
     directory = Path(args.output_dir)
     directory.mkdir(parents=True, exist_ok=True)
