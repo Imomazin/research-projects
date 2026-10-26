@@ -4,6 +4,8 @@ Private standalone repository for academic research projects, analysis and journ
 
 ## Active projects
 
+- Industry and Intelligent Systems / Industries / Privacy Trust and Intelligent Systems in Industry Six: six audited industrial and IoT datasets (182,926 task-specific observations), benchmark code, GitHub Actions pilot evidence, repeated-seed tests and external Bosch CNC machine-specific data preparation. The Industry 6.0 framing is prospective; the data are from existing industrial systems.
+
 - **Strategic Organization**: strategic capability asymmetry and occupational GenAI exposure
 - **Enterprise Information Systems**: P2 privacy-preserving federated intelligence, paired with Meridian (`Imomazin/ppdl-cross-org-intelligence`, branch `research/p2-systems-paper`). Research design and manuscript active. Robust/trust aggregation baselines and adaptive privacy scheduling are now being implemented; external grant datasets are registered but empirical results are not yet claimed.
 - **Electronic Commerce Research and Applications**: P3 causal attribution and budget optimisation, paired with Orbit / AI MarTech Growth Intelligence (`Imomazin/ai-martech-growth-intelligence`, branch `research/p3-causal-orbit`). Causal build active before empirical manuscript writing. DAG validation, AIPW effect estimation, overlap diagnostics, counterfactual helpers, semi-synthetic validation data generation and causal budget optimisation are now in the research branch.
