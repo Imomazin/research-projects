@@ -1,0 +1,30 @@
+name: Acquire IoT intrusion dataset
+on:
+  push:
+    paths:
+      - "Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six/Data Collection/Acquire IoT Intrusion.py"
+      - ".github/workflows/iot-intrusion-source.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  acquire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install "pandas>=2,<3"
+      - name: Acquire verify and record original UCI archive
+        run: python "Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six/Data Collection/Acquire IoT Intrusion.py"
+      - name: Commit original source and verification record
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six/Datasets/IoT Intrusion Source"
+          if ! git diff --cached --quiet; then
+            git commit -m "Add audited source archive for IoT intrusion transfer benchmark"
+            git push
+          fi
