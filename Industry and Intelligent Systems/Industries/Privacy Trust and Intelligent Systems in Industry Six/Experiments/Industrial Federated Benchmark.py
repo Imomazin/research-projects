@@ -148,7 +148,12 @@ def split_and_prepare(X, y, task, seed, max_rows, periods=None):
             shares = [max_rows * len(v) / len(y) for v in (train, valid, test)]
             sizes = [max(1, int(s)) for s in shares]
             while sum(sizes) > max_rows:
-                sizes[int(np.argmax(sizes))] -= 1
+                eligible = [i for i, size in enumerate(sizes) if size > 1]
+                sizes[max(eligible, key=lambda i: sizes[i] - shares[i])] -= 1
+            while sum(sizes) < max_rows:
+                original = [train, valid, test]
+                eligible = [i for i, size in enumerate(sizes) if size < len(original[i])]
+                sizes[max(eligible, key=lambda i: shares[i] - sizes[i])] += 1
             train, valid, test = [
                 np.sort(rng.choice(idx, size=min(count, len(idx)), replace=False))
                 for idx, count in zip((train, valid, test), sizes)
