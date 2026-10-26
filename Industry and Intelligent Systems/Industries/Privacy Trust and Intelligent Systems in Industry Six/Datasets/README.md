@@ -25,3 +25,9 @@ Original: UCI repository dataset 294, DOI 10.24432/C5002N; CC BY 4.0. Original r
 ## Gas Turbine Emissions (registered 26 October 2026)
 
 UCI dataset 551, DOI 10.24432/C5WC95, CC BY 4.0, includes 36,733 observed hourly turbine measurements in five annual CSV files. Download via UCI with the supplied downloader. The source describes chronology within original year files, but no independent industrial clients. Model targets CO or NOx separately, excluding other outcome targets as appropriate to each prediction question. Raw files have not yet been committed.
+
+## Research corpus as of 26 October 2026
+
+The full project now stores 182,926 source observations, including 49,809 measured industrial-production observations, 123,117 IoT testbed network records and 10,000 synthetic maintenance records. These are separate prediction tasks and must never be treated as interchangeable data from independent factories.
+
+The newly committed gas-turbine source consists of five original UCI annual files, with source hashes in Datasets/Gas Turbine Annual Records/Acquisition Audit.json. The original RT-IoT2022 UCI source is stored as a ZIP with source hashes and label counts in Datasets/IoT Intrusion Source/Acquisition Audit.json. Both are CC BY 4.0. The Research Corpus Manifest.json distinguishes observed and synthetic evidence, experimental tasks, file locations and critical external-validity restrictions.
