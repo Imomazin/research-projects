@@ -1,0 +1,387 @@
+{
+ "study": "Privacy, Trust & Intelligent Systems in Industry 6.0",
+ "stage": "sensitivity",
+ "dataset": "maintenance",
+ "design": "simulated",
+ "seed": 5,
+ "kind": "binary",
+ "executed_utc": "2026-10-26T21:16:38.962053+00:00",
+ "source_sha256": {
+  "Manufacturing Maintenance.csv": "53d0e7b71f760829a91ec3a9df54c0f044836074a227fe5be5a06bedd0cb1125"
+ },
+ "features_used": 8,
+ "clients": [
+  {
+   "train": 167,
+   "calibration": 51,
+   "test": 74,
+   "train_positive": 167,
+   "calibration_positive": 51
+  },
+  {
+   "train": 5433,
+   "calibration": 1804,
+   "test": 1723,
+   "train_positive": 0,
+   "calibration_positive": 0
+  },
+  {
+   "train": 419,
+   "calibration": 149,
+   "test": 133,
+   "train_positive": 0,
+   "calibration_positive": 0
+  },
+  {
+   "train": 27,
+   "calibration": 11,
+   "test": 9,
+   "train_positive": 27,
+   "calibration_positive": 11
+  }
+ ],
+ "test_rows": 1939,
+ "extra_tests": {},
+ "configuration": {
+  "frozen_utc": "2026-10-26T20:32:28+00:00",
+  "training": {
+   "rounds": 25,
+   "local_epochs": 2,
+   "batch": 64,
+   "hidden": [
+    64,
+    32
+   ],
+   "clip": 1.0,
+   "delta": 1e-05,
+   "momentum": 0.9,
+   "default_lr": 0.05
+  },
+  "tuning": {
+   "lr_grid": [
+    0.01,
+    0.03,
+    0.1,
+    0.3
+   ],
+   "prox_mu_grid": [
+    0.01,
+    0.1
+   ],
+   "dp_lr_grid": [
+    0.03,
+    0.1,
+    0.3,
+    1.0
+   ],
+   "dp_batch_grid": [
+    64,
+    256
+   ],
+   "dp_momentum_grid": [
+    0.5,
+    0.9
+   ],
+   "dp_batch_grid_by_dataset": {
+    "iot": [
+     256,
+     1024
+    ]
+   }
+  },
+  "tuning_seed": 0,
+  "clients": 4,
+  "dirichlet_alpha": 0.5,
+  "epsilons": [
+   1,
+   2,
+   4,
+   8
+  ],
+  "headline_epsilon": 4,
+  "calibration_epsilon_for_nonprivate_models": 4,
+  "policy": {
+   "alpha_miss": 0.1,
+   "alpha_false_alarm": 0.05,
+   "alpha_selective": 0.1,
+   "alpha_interval": 0.1,
+   "delta_test": 0.04,
+   "delta_count": 0.01
+  },
+  "policy_methods": [
+   "default",
+   "nonprivate_plugin",
+   "nonprivate_ltt",
+   "plugin",
+   "ucb_without_noise",
+   "proposed"
+  ],
+  "designs": {
+   "maintenance": [
+    "simulated"
+   ],
+   "steel": [
+    "simulated"
+   ],
+   "semiconductor": [
+    "simulated"
+   ],
+   "power": [
+    "simulated"
+   ],
+   "gas": [
+    "simulated"
+   ],
+   "iot": [
+    "simulated"
+   ],
+   "bosch": [
+    "machines",
+    "time holdout",
+    "machine holdout"
+   ],
+   "hai": [
+    "sessions"
+   ]
+  },
+  "batch_by_dataset": {
+   "iot": 256
+  },
+  "calibration_sweep_epsilons": [
+   0.5,
+   1,
+   2,
+   4,
+   8
+  ]
+ },
+ "notes": [
+  "Synthetic AI4I records; failure-mode flags excluded"
+ ],
+ "variant": "alpha 0.1",
+ "training_logs": {
+  "linear_seconds": 3.421699966565939e-05,
+  "fedavg": {
+   "rounds": 25,
+   "clients": 4,
+   "algorithm": "fedavg",
+   "aggregator": "mean",
+   "secure_aggregation": false,
+   "parameter_count": 2689,
+   "train_seconds": 1.0957412409998142,
+   "parameter_bytes_up": 1075600,
+   "parameter_bytes_down": 1075600
+  },
+  "dp eps 4": {
+   "rounds": 25,
+   "clients": 4,
+   "algorithm": "dp",
+   "aggregator": "mean",
+   "secure_aggregation": true,
+   "parameter_count": 2689,
+   "train_seconds": 0.9458688099994106,
+   "parameter_bytes_up": 1075600,
+   "parameter_bytes_down": 1075600,
+   "secure_aggregation_bytes": 1076112,
+   "secure_aggregation_seconds": 0.04739599999993516,
+   "privacy_unit": "one training record (add or remove)",
+   "accountant": "dp_accounting RDP, Poisson-subsampled Gaussian",
+   "delta": 1e-05,
+   "clip": 1.0,
+   "target_epsilon": 4.0,
+   "noise_multiplier_by_client": [
+    8.185276358995473,
+    1.9871625371401491,
+    7.162010893150937,
+    8.185276358995473
+   ],
+   "sample_rate_by_client": [
+    1.0,
+    0.047119455181299466,
+    0.6109785202863962,
+    1.0
+   ],
+   "steps_by_client": [
+    50,
+    1100,
+    100,
+    50
+   ],
+   "epsilon_by_client": [
+    3.9999836086903393,
+    3.999596236527655,
+    3.999865854856355,
+    3.9999836086903393
+   ],
+   "epsilon_max": 3.9999836086903393
+  }
+ },
+ "metrics": {
+  "reference": {
+   "test": {
+    "pr_auc": 0.042805569881382156,
+    "roc_auc": 0.5,
+    "balanced_accuracy": 0.5,
+    "macro_f1": 0.48906455862977605,
+    "mcc": 0.0,
+    "recall_rare": 0.0,
+    "false_positive_rate": 0.0,
+    "brier": 0.04108813372466863,
+    "nll": 0.17843831781793665,
+    "ece": 0.010718239414958065,
+    "prevalence": 0.042805569881382156,
+    "n": 1939
+   },
+   "client_tests": [
+    null,
+    null,
+    null,
+    null
+   ]
+  },
+  "fedavg": {
+   "test": {
+    "pr_auc": 0.04848330578711401,
+    "roc_auc": 0.5321263502285003,
+    "balanced_accuracy": 0.5,
+    "macro_f1": 0.48906455862977605,
+    "mcc": 0.0,
+    "recall_rare": 0.0,
+    "false_positive_rate": 0.0,
+    "brier": 0.04278470877201978,
+    "nll": 0.45274041780578717,
+    "ece": 0.04256461707169166,
+    "prevalence": 0.042805569881382156,
+    "n": 1939
+   },
+   "client_tests": [
+    null,
+    null,
+    null,
+    null
+   ]
+  },
+  "dp eps 4": {
+   "test": {
+    "pr_auc": 0.18181878153704756,
+    "roc_auc": 0.6992885334441213,
+    "balanced_accuracy": 0.5,
+    "macro_f1": 0.48906455862977605,
+    "mcc": 0.0,
+    "recall_rare": 0.0,
+    "false_positive_rate": 0.0,
+    "brier": 0.04222346401301317,
+    "nll": 0.45865284276509144,
+    "ece": 0.04227572281017818,
+    "prevalence": 0.042805569881382156,
+    "n": 1939
+   },
+   "client_tests": [
+    null,
+    null,
+    null,
+    null
+   ]
+  }
+ },
+ "risk_control": {
+  "fedavg": {
+   "nonprivate_ltt": {
+    "policy": {
+     "t_low": "-inf",
+     "t_high": 0.0024726231566347743,
+     "bins_low": 0,
+     "bins_high": 22,
+     "n1_lower": 62,
+     "n0_lower": 1953
+    },
+    "test": {
+     "miss_rate": 0.0,
+     "false_alarm_rate": 0.014008620689655173,
+     "escalation_rate": 0.9860752965446106,
+     "automation_rate": 0.013924703455389431,
+     "auto_pass_rate": 0.0,
+     "auto_alarm_rate": 0.013924703455389376,
+     "faults_escalated": 0.9879518072289156,
+     "faults_alarmed": 0.012048192771084338
+    },
+    "seconds": 0.02313910799966834
+   },
+   "proposed": {
+    "policy": {
+     "t_low": "-inf",
+     "t_high": 0.0024726231566347743,
+     "bins_low": 0,
+     "bins_high": 22,
+     "n1_lower": 56,
+     "n0_lower": 1950
+    },
+    "test": {
+     "miss_rate": 0.0,
+     "false_alarm_rate": 0.014008620689655173,
+     "escalation_rate": 0.9860752965446106,
+     "automation_rate": 0.013924703455389431,
+     "auto_pass_rate": 0.0,
+     "auto_alarm_rate": 0.013924703455389376,
+     "faults_escalated": 0.9879518072289156,
+     "faults_alarmed": 0.012048192771084338,
+     "binning_ece": 0.0201448721694333
+    },
+    "seconds": 0.041032424999684736
+   },
+   "secure_aggregation": {
+    "bytes": 1344,
+    "seconds": 0.004034355000840151
+   }
+  },
+  "dp eps 4": {
+   "nonprivate_ltt": {
+    "policy": {
+     "t_low": "-inf",
+     "t_high": 0.0006529653375526923,
+     "bins_low": 0,
+     "bins_high": 24,
+     "n1_lower": 62,
+     "n0_lower": 1953
+    },
+    "test": {
+     "miss_rate": 0.0,
+     "false_alarm_rate": 0.04310344827586207,
+     "escalation_rate": 0.9473955647240846,
+     "automation_rate": 0.05260443527591541,
+     "auto_pass_rate": 0.0,
+     "auto_alarm_rate": 0.05260443527591542,
+     "faults_escalated": 0.7349397590361446,
+     "faults_alarmed": 0.26506024096385544
+    },
+    "seconds": 0.022499830999549886
+   },
+   "proposed": {
+    "policy": {
+     "t_low": "-inf",
+     "t_high": 0.0006529653375526923,
+     "bins_low": 0,
+     "bins_high": 24,
+     "n1_lower": 56,
+     "n0_lower": 1950
+    },
+    "test": {
+     "miss_rate": 0.0,
+     "false_alarm_rate": 0.04310344827586207,
+     "escalation_rate": 0.9473955647240846,
+     "automation_rate": 0.05260443527591541,
+     "auto_pass_rate": 0.0,
+     "auto_alarm_rate": 0.05260443527591542,
+     "faults_escalated": 0.7349397590361446,
+     "faults_alarmed": 0.26506024096385544,
+     "binning_ece": 0.021799427324246435
+    },
+    "seconds": 0.03722567099976004
+   },
+   "secure_aggregation": {
+    "bytes": 1344,
+    "seconds": 0.0024808589996609953
+   }
+  }
+ }
+}

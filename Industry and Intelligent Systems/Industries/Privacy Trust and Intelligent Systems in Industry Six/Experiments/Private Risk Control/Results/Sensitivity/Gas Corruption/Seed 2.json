@@ -1,0 +1,582 @@
+{
+ "study": "Privacy, Trust & Intelligent Systems in Industry 6.0",
+ "stage": "sensitivity",
+ "dataset": "gas",
+ "design": "simulated",
+ "seed": 2,
+ "kind": "regression",
+ "executed_utc": "2026-10-26T21:09:34.779220+00:00",
+ "source_sha256": {
+  "Gas Turbine First Year.csv": "d87ceef9aa59533cc7d924d10de241b1b06ecd11f9b26bab59191ea0f8a76b9a",
+  "Gas Turbine Second Year.csv": "be54b9d0e1a7de40c55d32fa489e75de892b000c066b5a09f09a19124ee29100",
+  "Gas Turbine Third Year.csv": "13c437bb440ec2045bd12057e6654c41dd4107a661eac16ba2e878e897a08f9e",
+  "Gas Turbine Fourth Year.csv": "c2a03c92c9c3207aad0c6be7de8d9b5b4bfa4720ad0efb2c1f21b6cec4d3f3fa",
+  "Gas Turbine Fifth Year.csv": "9b08f35fde0d4b138232a605db4093c2b8bf9d6757e6f1fbd9534ad616c13591"
+ },
+ "features_used": 9,
+ "clients": [
+  {
+   "train": 3529,
+   "calibration": 1262,
+   "test": 1175,
+   "train_positive": null,
+   "calibration_positive": null
+  },
+  {
+   "train": 2424,
+   "calibration": 832,
+   "test": 812,
+   "train_positive": null,
+   "calibration_positive": null
+  },
+  {
+   "train": 4951,
+   "calibration": 1571,
+   "test": 1616,
+   "train_positive": null,
+   "calibration_positive": null
+  },
+  {
+   "train": 2386,
+   "calibration": 812,
+   "test": 821,
+   "train_positive": null,
+   "calibration_positive": null
+  }
+ ],
+ "test_rows": 4424,
+ "extra_tests": {
+  "year 2014": 7158,
+  "year 2015": 7384
+ },
+ "configuration": {
+  "frozen_utc": "2026-10-26T20:32:28+00:00",
+  "training": {
+   "rounds": 25,
+   "local_epochs": 2,
+   "batch": 64,
+   "hidden": [
+    64,
+    32
+   ],
+   "clip": 1.0,
+   "delta": 1e-05,
+   "momentum": 0.9,
+   "default_lr": 0.05
+  },
+  "tuning": {
+   "lr_grid": [
+    0.01,
+    0.03,
+    0.1,
+    0.3
+   ],
+   "prox_mu_grid": [
+    0.01,
+    0.1
+   ],
+   "dp_lr_grid": [
+    0.03,
+    0.1,
+    0.3,
+    1.0
+   ],
+   "dp_batch_grid": [
+    64,
+    256
+   ],
+   "dp_momentum_grid": [
+    0.5,
+    0.9
+   ],
+   "dp_batch_grid_by_dataset": {
+    "iot": [
+     256,
+     1024
+    ]
+   }
+  },
+  "tuning_seed": 0,
+  "clients": 4,
+  "dirichlet_alpha": 0.5,
+  "epsilons": [
+   1,
+   2,
+   4,
+   8
+  ],
+  "headline_epsilon": 4,
+  "calibration_epsilon_for_nonprivate_models": 4,
+  "policy": {
+   "alpha_miss": 0.1,
+   "alpha_false_alarm": 0.05,
+   "alpha_selective": 0.1,
+   "alpha_interval": 0.1,
+   "delta_test": 0.04,
+   "delta_count": 0.01
+  },
+  "policy_methods": [
+   "default",
+   "nonprivate_plugin",
+   "nonprivate_ltt",
+   "plugin",
+   "ucb_without_noise",
+   "proposed"
+  ],
+  "designs": {
+   "maintenance": [
+    "simulated"
+   ],
+   "steel": [
+    "simulated"
+   ],
+   "semiconductor": [
+    "simulated"
+   ],
+   "power": [
+    "simulated"
+   ],
+   "gas": [
+    "simulated"
+   ],
+   "iot": [
+    "simulated"
+   ],
+   "bosch": [
+    "machines",
+    "time holdout",
+    "machine holdout"
+   ],
+   "hai": [
+    "sessions"
+   ]
+  },
+  "batch_by_dataset": {
+   "iot": 256
+  },
+  "calibration_sweep_epsilons": [
+   0.5,
+   1,
+   2,
+   4,
+   8
+  ]
+ },
+ "notes": [],
+ "variant": "corruption",
+ "training_logs": {
+  "linear_seconds": 6.667100024060346e-05,
+  "fedavg": {
+   "rounds": 25,
+   "clients": 4,
+   "algorithm": "fedavg",
+   "aggregator": "mean",
+   "secure_aggregation": false,
+   "parameter_count": 2753,
+   "train_seconds": 2.012963471999683,
+   "parameter_bytes_up": 1101200,
+   "parameter_bytes_down": 1101200
+  },
+  "dp eps 4": {
+   "rounds": 25,
+   "clients": 4,
+   "algorithm": "dp",
+   "aggregator": "mean",
+   "secure_aggregation": true,
+   "parameter_count": 2753,
+   "train_seconds": 2.0894674629998917,
+   "parameter_bytes_up": 1101200,
+   "parameter_bytes_down": 1101200,
+   "secure_aggregation_bytes": 1101712,
+   "secure_aggregation_seconds": 0.05332478500167781,
+   "privacy_unit": "one training record (add or remove)",
+   "accountant": "dp_accounting RDP, Poisson-subsampled Gaussian",
+   "delta": 1e-05,
+   "clip": 1.0,
+   "target_epsilon": 4.0,
+   "noise_multiplier_by_client": [
+    2.3889516991062756,
+    2.8902743616656346,
+    2.0680228880359013,
+    2.9324466985718707
+   ],
+   "sample_rate_by_client": [
+    0.07254179654293001,
+    0.10561056105610561,
+    0.05170672591395677,
+    0.10729253981559095
+   ],
+   "steps_by_client": [
+    700,
+    500,
+    1000,
+    500
+   ],
+   "epsilon_by_client": [
+    3.99951322769145,
+    3.9996531549385343,
+    3.999604149401927,
+    3.999571850123755
+   ],
+   "epsilon_max": 3.9996531549385343
+  }
+ },
+ "metrics": {
+  "reference": {
+   "test": {
+    "rmse": 11.144642704002495,
+    "mae": 8.378302392944526,
+    "r2": -0.00041036776525538166,
+    "n": 4424
+   },
+   "year 2014": {
+    "rmse": 13.170618666675308,
+    "mae": 11.323221708374787,
+    "r2": -0.7447452544627293,
+    "n": 7158
+   },
+   "year 2015": {
+    "rmse": 14.178334257285057,
+    "mae": 12.342208390956399,
+    "r2": -0.6222830891557902,
+    "n": 7384
+   },
+   "client_tests": [
+    {
+     "rmse": 14.33467259455026,
+     "mae": 12.066495022393173,
+     "r2": -0.14370043532836485,
+     "n": 1175
+    },
+    {
+     "rmse": 9.711353121882881,
+     "mae": 6.86408336025709,
+     "r2": -0.3178501793755828,
+     "n": 812
+    },
+    {
+     "rmse": 10.89930581646451,
+     "mae": 8.362948970167324,
+     "r2": -0.0059069015134813885,
+     "n": 1616
+    },
+    {
+     "rmse": 6.934483121219986,
+     "mae": 4.627669806035871,
+     "r2": -0.0019420816779571748,
+     "n": 821
+    }
+   ]
+  },
+  "fedavg": {
+   "test": {
+    "rmse": 4.699964101126718,
+    "mae": 3.2317330837249756,
+    "r2": 0.8220757842063904,
+    "n": 4424
+   },
+   "year 2014": {
+    "rmse": 12.307075041184072,
+    "mae": 9.92992115020752,
+    "r2": -0.5234540700912476,
+    "n": 7158
+   },
+   "year 2015": {
+    "rmse": 20.857303267905344,
+    "mae": 17.058008193969727,
+    "r2": -2.510690450668335,
+    "n": 7384
+   },
+   "client_tests": [
+    {
+     "rmse": 5.596669548689778,
+     "mae": 3.884657144546509,
+     "r2": 0.8256604075431824,
+     "n": 1175
+    },
+    {
+     "rmse": 3.7728866269821886,
+     "mae": 2.8273048400878906,
+     "r2": 0.801091194152832,
+     "n": 812
+    },
+    {
+     "rmse": 4.6469919216938695,
+     "mae": 3.1331608295440674,
+     "r2": 0.8171462416648865,
+     "n": 1616
+    },
+    {
+     "rmse": 4.197493059290043,
+     "mae": 2.8912971019744873,
+     "r2": 0.6328915357589722,
+     "n": 821
+    }
+   ],
+   "corrupted": {
+    "gaussian 0.5": {
+     "rmse": 16.968684356169067,
+     "mae": 12.457099914550781,
+     "r2": -1.3192219734191895,
+     "n": 4424
+    },
+    "gaussian 1": {
+     "rmse": 33.64549974841082,
+     "mae": 24.471288681030273,
+     "r2": -8.118006706237793,
+     "n": 4424
+    },
+    "missing 0.2": {
+     "rmse": 13.9980832558914,
+     "mae": 7.984251499176025,
+     "r2": -0.5782763957977295,
+     "n": 4424
+    },
+    "missing 0.4": {
+     "rmse": 17.371530749085018,
+     "mae": 10.823823928833008,
+     "r2": -1.4306483268737793,
+     "n": 4424
+    }
+   }
+  },
+  "dp eps 4": {
+   "test": {
+    "rmse": 5.1865965274752535,
+    "mae": 3.3498380184173584,
+    "r2": 0.7833239436149597,
+    "n": 4424
+   },
+   "year 2014": {
+    "rmse": 10.949079389498419,
+    "mae": 9.3726167678833,
+    "r2": -0.20579898357391357,
+    "n": 7158
+   },
+   "year 2015": {
+    "rmse": 16.18997515162257,
+    "mae": 14.570300102233887,
+    "r2": -1.115283489227295,
+    "n": 7384
+   },
+   "client_tests": [
+    {
+     "rmse": 6.436992736385621,
+     "mae": 4.200832366943359,
+     "r2": 0.7693769335746765,
+     "n": 1175
+    },
+    {
+     "rmse": 3.8096908475948603,
+     "mae": 2.693955898284912,
+     "r2": 0.7971915602684021,
+     "n": 812
+    },
+    {
+     "rmse": 5.037449588949358,
+     "mae": 3.213360071182251,
+     "r2": 0.7851271629333496,
+     "n": 1616
+    },
+    {
+     "rmse": 4.620886752086698,
+     "mae": 3.0492348670959473,
+     "r2": 0.5550972819328308,
+     "n": 821
+    }
+   ],
+   "corrupted": {
+    "gaussian 0.5": {
+     "rmse": 11.355244343327874,
+     "mae": 8.90005874633789,
+     "r2": -0.03857743740081787,
+     "n": 4424
+    },
+    "gaussian 1": {
+     "rmse": 19.89563759379608,
+     "mae": 15.807053565979004,
+     "r2": -2.1883182525634766,
+     "n": 4424
+    },
+    "missing 0.2": {
+     "rmse": 9.27923582679613,
+     "mae": 6.241677284240723,
+     "r2": 0.30646181106567383,
+     "n": 4424
+    },
+    "missing 0.4": {
+     "rmse": 11.120995304380745,
+     "mae": 7.922351837158203,
+     "r2": 0.003830432891845703,
+     "n": 4424
+    }
+   }
+  }
+ },
+ "risk_control": {
+  "fedavg": {
+   "nonprivate_ltt": {
+    "policy": {
+     "half_width_scaled": 0.7000000000000001,
+     "bins": 67,
+     "n_lower": 4477
+    },
+    "gaussian 0.5": {
+     "coverage": 0.42857142857142855,
+     "exceedance": 0.5714285714285714,
+     "half_width": 7.675438429024086
+    },
+    "gaussian 1": {
+     "coverage": 0.23462929475587704,
+     "exceedance": 0.765370705244123,
+     "half_width": 7.675438429024086
+    },
+    "missing 0.2": {
+     "coverage": 0.6966546112115732,
+     "exceedance": 0.30334538878842676,
+     "half_width": 7.675438429024086
+    },
+    "missing 0.4": {
+     "coverage": 0.5576401446654611,
+     "exceedance": 0.4423598553345389,
+     "half_width": 7.675438429024086
+    },
+    "year 2014": {
+     "coverage": 0.41827326068734283,
+     "exceedance": 0.5817267393126572,
+     "half_width": 7.675438429024086
+    },
+    "year 2015": {
+     "coverage": 0.1495124593716143,
+     "exceedance": 0.8504875406283857,
+     "half_width": 7.675438429024086
+    },
+    "seconds": 0.06706461199974001
+   },
+   "proposed": {
+    "policy": {
+     "half_width_scaled": 0.7000000000000001,
+     "bins": 67,
+     "n_lower": 4470
+    },
+    "gaussian 0.5": {
+     "coverage": 0.42857142857142855,
+     "exceedance": 0.5714285714285714,
+     "half_width": 7.675438429024086
+    },
+    "gaussian 1": {
+     "coverage": 0.23462929475587704,
+     "exceedance": 0.765370705244123,
+     "half_width": 7.675438429024086
+    },
+    "missing 0.2": {
+     "coverage": 0.6966546112115732,
+     "exceedance": 0.30334538878842676,
+     "half_width": 7.675438429024086
+    },
+    "missing 0.4": {
+     "coverage": 0.5576401446654611,
+     "exceedance": 0.4423598553345389,
+     "half_width": 7.675438429024086
+    },
+    "year 2014": {
+     "coverage": 0.41827326068734283,
+     "exceedance": 0.5817267393126572,
+     "half_width": 7.675438429024086
+    },
+    "year 2015": {
+     "coverage": 0.1495124593716143,
+     "exceedance": 0.8504875406283857,
+     "half_width": 7.675438429024086
+    },
+    "seconds": 0.16753254300056142
+   },
+   "secure_aggregation": {
+    "bytes": 1808,
+    "seconds": 0.001283365000745107
+   }
+  },
+  "dp eps 4": {
+   "nonprivate_ltt": {
+    "policy": {
+     "half_width_scaled": 0.7500000000000001,
+     "bins": 66,
+     "n_lower": 4477
+    },
+    "gaussian 0.5": {
+     "coverage": 0.5492766726943942,
+     "exceedance": 0.4507233273056058,
+     "half_width": 8.223684031097235
+    },
+    "gaussian 1": {
+     "coverage": 0.3198462929475588,
+     "exceedance": 0.6801537070524413,
+     "half_width": 8.223684031097235
+    },
+    "missing 0.2": {
+     "coverage": 0.7391500904159132,
+     "exceedance": 0.2608499095840868,
+     "half_width": 8.223684031097235
+    },
+    "missing 0.4": {
+     "coverage": 0.640370705244123,
+     "exceedance": 0.359629294755877,
+     "half_width": 8.223684031097235
+    },
+    "year 2014": {
+     "coverage": 0.4633975970941604,
+     "exceedance": 0.5366024029058396,
+     "half_width": 8.223684031097235
+    },
+    "year 2015": {
+     "coverage": 0.18851570964247022,
+     "exceedance": 0.8114842903575298,
+     "half_width": 8.223684031097235
+    },
+    "seconds": 0.06516355100029614
+   },
+   "proposed": {
+    "policy": {
+     "half_width_scaled": 0.7500000000000001,
+     "bins": 66,
+     "n_lower": 4470
+    },
+    "gaussian 0.5": {
+     "coverage": 0.5492766726943942,
+     "exceedance": 0.4507233273056058,
+     "half_width": 8.223684031097235
+    },
+    "gaussian 1": {
+     "coverage": 0.3198462929475588,
+     "exceedance": 0.6801537070524413,
+     "half_width": 8.223684031097235
+    },
+    "missing 0.2": {
+     "coverage": 0.7391500904159132,
+     "exceedance": 0.2608499095840868,
+     "half_width": 8.223684031097235
+    },
+    "missing 0.4": {
+     "coverage": 0.640370705244123,
+     "exceedance": 0.359629294755877,
+     "half_width": 8.223684031097235
+    },
+    "year 2014": {
+     "coverage": 0.4633975970941604,
+     "exceedance": 0.5366024029058396,
+     "half_width": 8.223684031097235
+    },
+    "year 2015": {
+     "coverage": 0.18851570964247022,
+     "exceedance": 0.8114842903575298,
+     "half_width": 8.223684031097235
+    },
+    "seconds": 0.134857395999461
+   },
+   "secure_aggregation": {
+    "bytes": 1808,
+    "seconds": 0.001158943000518775
+   }
+  }
+ }
+}
