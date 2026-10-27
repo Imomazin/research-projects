@@ -31,3 +31,15 @@ UCI dataset 551, DOI 10.24432/C5WC95, CC BY 4.0, includes 36,733 observed hourly
 The full project now stores 182,926 source observations, including 49,809 measured industrial-production observations, 123,117 IoT testbed network records and 10,000 synthetic maintenance records. These are separate prediction tasks and must never be treated as interchangeable data from independent factories.
 
 The newly committed gas-turbine source consists of five original UCI annual files, with source hashes in Datasets/Gas Turbine Annual Records/Acquisition Audit.json. The original RT-IoT2022 UCI source is stored as a ZIP with source hashes and label counts in Datasets/IoT Intrusion Source/Acquisition Audit.json. Both are CC BY 4.0. The Research Corpus Manifest.json distinguishes observed and synthetic evidence, experimental tasks, file locations and critical external-validity restrictions.
+
+## Bosch CNC Machining (added 26 October 2026)
+
+Official repository github.com/boschresearch/CNC_Machining cloned at commit d60581d6a3ab6015dcc5488c3d76112bb8e1bcb1 (1,702 HDF5 recordings: M01 519, M02 644, M03 539; 70 anomalous: 34, 27 and 9). The UCI listing (dataset 752) reports 2,700 instances; the difference could not be resolved from public documentation. Features were extracted with Data Collection/Prepare Bosch CNC Features.py and 90 axis statistics from 30 random recordings were recomputed independently with no mismatch. Data CC BY 4.0; cite Tnani, Feil and Diepold (2022), doi:10.1016/j.procir.2022.04.022. The derived table is in Bosch CNC; raw recordings stay outside the repository.
+
+## HAI 21.03 industrial control security (added 26 October 2026)
+
+Official repository github.com/icsdataset/hai at commit 2a814cebc9a66b06c9e5cd545e2d72e65d383737, attack files test1 to test5 (402,005 one-second records, 50 attack events). Data Collection/Prepare HAI Window Features.py forms 13,400 thirty-second windows (330 attack windows) with mean, standard deviation and change of 79 sensors. Licence CC BY-SA 4.0, which the derived table inherits; cite Shin, Lee, Yun and Min (2021), doi:10.1145/3474718.3474719.
+
+## Candidates not acquired
+
+TON_IoT, Edge-IIoTset, CIC IoT 2023, N-BaIoT and NASA C-MAPSS hosts were unreachable from the execution environment or required registration; SWaT forbids redistribution. Source Register.csv records each with its reason.

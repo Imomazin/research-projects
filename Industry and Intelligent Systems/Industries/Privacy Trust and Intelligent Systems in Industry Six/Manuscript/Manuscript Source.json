@@ -1,0 +1,1844 @@
+{
+ "title": "Privacy, Trust & Intelligent Systems in Industry 6.0",
+ "blocks": [
+  {
+   "type": "title",
+   "text": "Privacy, Trust & Intelligent Systems in Industry 6.0"
+  },
+  {
+   "type": "meta",
+   "text": "Imo Enang"
+  },
+  {
+   "type": "meta",
+   "text": "Department of Electrical Engineering and Computer Science, Florida Atlantic University, Boca Raton, FL 33431, USA; imowo.enang@gmail.com"
+  },
+  {
+   "type": "h1",
+   "text": "Abstract"
+  },
+  {
+   "type": "p",
+   "text": "Industrial sites want to learn from each other's data without disclosing it and to automate decisions only where errors stay within stated limits. Private federated detectors report accuracy and privacy budgets but give no certified bound on the decisions that follow. We propose private aggregate risk control (PARC): sites train a model with differentially private federated averaging, add Skellam noise to histograms of calibration scores and combine them by secure aggregation and the server certifies automatic-pass and automatic-alarm thresholds with a binomial-Skellam test. We prove finite-sample validity under the privacy noise and derive the minimum calibration evidence that certification needs. On eight industrial and security tasks (198,028 observations; 95 confirmatory runs) PARC exceeded a 10% miss-rate target in 1 of 325 runs against 39 for a private plug-in rule. Private calibration was nearly free at ε ≥ 4, but a 10% miss-rate certificate needed at least 31 calibration faults without privacy and 118 at ε = 1. DP training cut rare-fault PR-AUC on AI4I from 0.581 to 0.264 at ε = 4 and drift broke interval coverage on a gas turbine. Operators should count failure evidence before choosing privacy budgets and treat escalation as the channel for human oversight."
+  },
+  {
+   "type": "p",
+   "text": "**Keywords:** privacy-preserving deep learning; federated learning; differential privacy; secure aggregation; conformal risk control; trustworthy AI; industrial fault detection; Industry 6.0"
+  },
+  {
+   "type": "h1",
+   "text": "Introduction"
+  },
+  {
+   "type": "p",
+   "text": "Industrial operators increasingly want to learn from data held by other sites, machines and suppliers without moving that data. Federated learning trains a shared model by exchanging model updates rather than records [1,2] and differentially private stochastic gradient descent (DP-SGD) bounds what those updates reveal about any single training record [3,4]. These tools have reached manufacturing and industrial security research, where federated detectors for machine faults, industrial Internet of Things (IIoT) intrusions and anomalous control behaviour are now common [5–8]. The reported results concentrate on accuracy and on the privacy mechanism. They say much less about the decision that follows a prediction, which in a factory is usually a choice between letting a part or a process continue, stopping it, or asking an engineer to look."
+  },
+  {
+   "type": "p",
+   "text": "That decision is where trust is tested. A fault detector that misses rare failures can show high accuracy and a privacy mechanism that adds noise to training can make those misses more frequent for exactly the minority classes that matter [9]. Engineers therefore need a statement about the error rate of automated decisions that holds for the deployed model, at a stated confidence and under a stated privacy guarantee. Distribution-free calibration methods such as split conformal prediction and Learn-then-Test give such statements for a pooled calibration set [10–13]. In a federation the calibration records are spread across sites and are as sensitive as the training records, so the calibration step itself must respect the privacy and secure aggregation design of the federation."
+  },
+  {
+   "type": "p",
+   "text": "Recent work has started to join these threads. Federated conformal prediction pools calibration information across clients [14–16]. Differentially private conformal prediction protects the calibration quantile in a central setting [17–19] or under local differential privacy [20]. Private federated calibration of probabilities has been studied with secure aggregation and server-side noise [21] and federated calibration of intrusion detectors has been proposed without formal privacy [22]. To our knowledge no published method certifies asymmetric industrial decision risks (missed faults and false alarms) from calibration data that never leave the sites in clear form, with noise added by the clients themselves so that a secure-aggregation server never holds an unprotected statistic and with a finite-sample guarantee that accounts for that noise."
+  },
+  {
+   "type": "p",
+   "text": "The emerging literature on Industry 6.0 gives this question a wider setting. Authors use the term for industrial systems in which autonomous, distributed and increasingly AI-driven control operates across organisational boundaries [23–26]. The term has no agreed definition and no policy status comparable to Industry 5.0, which the European Commission framed around human-centred, resilient and sustainable industry [27–30]. We treat Industry 6.0 as a set of proposed capabilities. The part we test is narrow and present-day: whether privacy-preserving collaborative learning can hand decisions to automation only where an error bound can be certified and route the remainder to people."
+  },
+  {
+   "type": "p",
+   "text": "This paper asks how industrial systems can learn collaboratively while preserving data privacy, keeping automated decisions within stated error bounds and remaining usable under heterogeneity and attack. We make three contributions. First, we specify private aggregate risk control (PARC), a calibration protocol in which each site adds Skellam noise to a fixed histogram of calibration scores, the sums are formed by pairwise-mask secure aggregation and the server certifies automatic-pass and automatic-alarm thresholds with a fixed-sequence test whose p-values are exact binomial-Skellam convolutions. We prove that the certified miss and false-alarm rates hold with probability at least 0.90, that the whole pipeline costs no more record-level privacy than its larger component when roles are assigned record by record and that certification requires a minimum count of calibration events which we compute exactly. Second, we evaluate the protocol with DP federated training on eight industrial and security tasks covering 198,028 analysed observations, including three physical CNC machines and five chronological sessions of an industrial control testbed, over 95 confirmatory runs, a Monte Carlo check with known score distributions and attack and robustness experiments. Third, we turn the evidence into operating rules for industrial governance: how much calibration evidence a site needs, when private calibration is cheap and when it is not and what fails under drift."
+  },
+  {
+   "type": "p",
+   "text": "The remainder of the paper reviews related work, states the theoretical framework and research questions, describes data and methods, reports results by research question and discusses implications and limits."
+  },
+  {
+   "type": "h1",
+   "text": "Background and Related Work"
+  },
+  {
+   "type": "h2",
+   "text": "From Industry 4.0 to a proposed Industry 6.0"
+  },
+  {
+   "type": "p",
+   "text": "Industry 4.0 describes connected cyber-physical production in which machine data feed planning and control [28]. Industry 5.0 adds human-centred work, resilience and sustainability as explicit goals and was set out by the European Commission in 2021 [27]; later reviews treat it as a complement to the technology agenda of Industry 4.0 rather than a separate technology stage [28–30]. Writing on Industry 6.0 is more recent and less settled. Duggal and colleagues sketched a roadmap built on hyper-connected, customer-driven manufacturing [23]; a Finnish white paper described antifragile, virtualised production with dynamic supply chains [31]; Fernández-Miguel and colleagues proposed a cognitive manufacturing framework with AI-driven decentralised control and explicitly declined to fix a single definition [24]; Lykov and colleagues demonstrated a generative-AI and multi-robot production chain under the same label [25]; and Babkin and colleagues framed it as human and machine counterparts in cyber-social systems [26]. Two features recur across these sources: decisions are delegated to distributed learning systems that span organisations and human oversight changes from operating machines to supervising automated judgement. Both features raise the questions this paper measures, namely what a shared model reveals about each participant and when an automated decision can be trusted without a person."
+  },
+  {
+   "type": "h2",
+   "text": "Privacy-preserving federated learning"
+  },
+  {
+   "type": "p",
+   "text": "Federated averaging (FedAvg) alternates local optimisation and server averaging [1]. Heterogeneous clients motivate proximal (FedProx) and control-variate (SCAFFOLD) corrections [32,33] and malicious clients motivate coordinate-wise median and trimmed-mean aggregation [34,35], which in turn can be attacked [36,37]. Model updates leak training data through membership inference and gradient inversion [38–42]. DP-SGD clips each per-example gradient and adds Gaussian noise, with the cumulative guarantee tracked through Rényi differential privacy (RDP) [3,43]. Secure aggregation hides individual updates from the server by pairwise masks that cancel in the sum [44]; because the server then sees only sums, noise must be added by clients and must remain a valid privacy mechanism after summation, which motivates discrete mechanisms such as the distributed discrete Gaussian and the Skellam mechanism [45,46]. A consequence noted in the survey literature is that secure aggregation and Byzantine-robust aggregation conflict, since robust rules need individual updates [2]. DP training also harms minority classes more than majority classes [9], which matters for rare industrial faults."
+  },
+  {
+   "type": "h2",
+   "text": "Calibration, selective prediction and risk control"
+  },
+  {
+   "type": "p",
+   "text": "Modern neural networks are often miscalibrated [47]. Selective classification abstains when confidence is low [48] and conformal prediction turns a held-out calibration set into prediction sets with finite-sample coverage under exchangeability [10,11]. Risk-controlling prediction sets and Learn-then-Test generalise coverage to any monotone or testable risk by casting threshold selection as multiple hypothesis testing [12,13]. For a monotone risk a fixed-sequence test that stops at the first non-rejection controls the family-wise error without a union bound, which is the property we use."
+  },
+  {
+   "type": "h2",
+   "text": "Privacy in calibration and the gap this study addresses"
+  },
+  {
+   "type": "p",
+   "text": "Table 1 compares the closest methods. Private prediction sets compute a differentially private conformal quantile centrally and correct for the noise [17]; later centralised methods use quantile binary search or full-data stability arguments [18,19]. Local differential privacy versions perturb labels or scores before collection [20]. Federated conformal predictors aggregate calibration information under partial exchangeability [14], one-shot federated conformal prediction offers a locally private quantile-of-quantiles estimator [15] and DP-FedCP adds client-side Gaussian noise to quantile-regression gradients with approximate coverage bounds [16]. Private federated post-hoc calibration combines secure aggregation with server-added Gaussian noise for user-level privacy and targets calibration error [21]. A Byzantine-robust federated conformal method uses histograms of calibration scores without formal privacy [49]. In industrial applications, federated detectors report accuracy and sometimes a nominal privacy budget without composition or calibration analysis [6–8] and a federated calibrator for intrusion detection improves confidence estimates without formal privacy or risk control [22]."
+  },
+  {
+   "type": "p",
+   "text": "The comparison shows four gaps. Existing private calibration methods control marginal coverage rather than the asymmetric pair of risks that industrial decisions involve, a missed fault and an unnecessary stop. Those that use secure aggregation rely on a trusted party to add noise, whereas a federation whose server sees only masked sums needs noise that each client adds and that remains exact after summation. The interaction between the privacy of training records and calibration records is not analysed, so practitioners cannot say what the full pipeline costs. Finally, none reports the minimum calibration evidence that a guarantee requires, which for rare industrial faults is the binding constraint. PARC addresses these gaps by design and the experiments test whether the design holds on industrial data."
+  },
+  {
+   "type": "table",
+   "caption": "**Table 1.** Closest methods and the features of this study. DP: differential privacy; SecAgg: secure aggregation.",
+   "header": [
+    "Study",
+    "Setting",
+    "Privacy and who adds noise",
+    "Guarantee",
+    "Risks controlled",
+    "Industrial data"
+   ],
+   "widths": [
+    2.2,
+    1.6,
+    2.2,
+    1.6,
+    1.6,
+    1.2
+   ],
+   "rows": [
+    [
+     "Angelopoulos et al. [17]",
+     "Central",
+     "DP quantile, trusted curator",
+     "Coverage, noise-corrected",
+     "Miscoverage",
+     "No"
+    ],
+    [
+     "Romanus and Molinari [18]; Wu et al. [19]",
+     "Central",
+     "DP quantile or DP training, trusted curator",
+     "Approximate or conditional coverage",
+     "Miscoverage",
+     "No"
+    ],
+    [
+     "Penso et al. [20]",
+     "Local users",
+     "Local DP on labels or scores",
+     "Finite-sample coverage",
+     "Miscoverage",
+     "No"
+    ],
+    [
+     "Lu et al. [14]",
+     "Federated",
+     "None",
+     "Coverage under partial exchangeability",
+     "Miscoverage",
+     "No"
+    ],
+    [
+     "Humbert et al. [15]",
+     "Federated, one round",
+     "Local DP variant",
+     "Coverage",
+     "Miscoverage",
+     "No"
+    ],
+    [
+     "Plassier et al. [16]",
+     "Federated, label shift",
+     "Client Gaussian on gradients; no SecAgg",
+     "Approximate coverage",
+     "Miscoverage",
+     "No"
+    ],
+    [
+     "Maddock et al. [21]",
+     "Federated calibration",
+     "SecAgg plus server-added Gaussian; user-level",
+     "Calibration error",
+     "None (ECE)",
+     "No"
+    ],
+    [
+     "Lari et al. [49]",
+     "Federated, Byzantine",
+     "None (histograms in clear)",
+     "Coverage under attack",
+     "Miscoverage",
+     "No"
+    ],
+    [
+     "Talpini et al. [22]",
+     "Federated IDS calibration",
+     "None formal",
+     "Empirical",
+     "None",
+     "Intrusion data"
+    ],
+    [
+     "Padmavathi and Saminathan [8]; Kamali Poorazad et al. [7]",
+     "Federated IoT/IIoT detection",
+     "DP without accounting; homomorphic encryption",
+     "None for decisions",
+     "None",
+     "Yes"
+    ],
+    [
+     "This study (PARC)",
+     "Federated, cross-site",
+     "Client-side Skellam under SecAgg; record-level; exact accounting",
+     "Finite-sample PAC bound including noise",
+     "Miss and false-alarm rates; selective error; interval exceedance",
+     "Yes: 8 tasks, 3 machines, ICS sessions"
+    ]
+   ]
+  },
+  {
+   "type": "h1",
+   "text": "Theoretical Framework and Research Questions"
+  },
+  {
+   "type": "p",
+   "text": "We combine two lenses. Socio-technical systems thinking, which the NIST AI Risk Management Framework adopts when it describes AI risk as arising from the interaction of technical components with people and organisations [50], directs attention to the hand-off between automation and human judgement. Trustworthy AI frameworks and the European AI Act add concrete requirements for that hand-off: risks must be measured and managed and high-risk systems must allow effective human oversight, including the ability to override or stop the system [50,51]. From these lenses we derive a mechanism with three links (Figure 1). Privacy-preserving collaboration determines what each site discloses. Distributed learning determines how well the shared model ranks risky cases. Certified calibration converts ranking quality and calibration evidence into an explicit split between automated and escalated decisions. Human oversight receives the escalated cases and governs recalibration. Trust in this framework is multidimensional: it includes ranking quality, calibration, the validity of stated error bounds, robustness to corruption and attack and the share of decisions that people must still make."
+  },
+  {
+   "type": "figure",
+   "path": "../Figures/Research Framework.png",
+   "alt": "Research framework. Solid links were measured in this study; dashed links are proposed.",
+   "caption": "**Figure 1.** Research framework. Solid links were measured in this study; dashed links are proposed."
+  },
+  {
+   "type": "p",
+   "text": "The framework yields five research questions. RQ1 asks how formal privacy budgets change the utility of federated industrial models. RQ2 asks how client heterogeneity, participation and machine or session structure change reliability. RQ3 asks which mechanisms preserve calibration, minority-event detection and dependable decisions under privacy and attack. RQ4 asks whether PARC provides valid risk control at an acceptable cost relative to established alternatives. RQ5 asks under which tasks, machines and shifts the guarantees remain useful. Four hypotheses were frozen before the confirmatory runs (Methods). H1 states that PARC thresholds respect their targets with the stated confidence when the score distributions are known. H2 states that, on held-out industrial data, PARC exceeds the miss-rate target less often than a private plug-in rule applied to the same noisy histograms. H3 states that private calibration at ε = 4 adds less than five percentage points of escalation relative to non-private Learn-then-Test on the same DP model. H4 states that realised risk rises on non-exchangeable tests. H1 and H2 could fail through an error in the derivation or implementation; H3 could fail if noise forces conservative thresholds; H4 could fail if the tested shifts are benign."
+  },
+  {
+   "type": "h1",
+   "text": "Materials and Methods"
+  },
+  {
+   "type": "h2",
+   "text": "Data and evaluation designs"
+  },
+  {
+   "type": "p",
+   "text": "We used eight tasks (Table 2). Six were already registered in the project repository: AI4I 2020 predictive maintenance (10,000 synthetic records, 339 failures) [52], SECOM semiconductor yield (1,567 observed runs, 590 sensors, 104 failures) [53], Steel Plates Faults (1,941 observed plates, seven defect classes) [54], Combined Cycle Power Plant output (9,568 observations) [55], gas turbine NOx emissions (36,733 hourly records in five annual files) [56] and RT-IoT2022 network flows (123,117 flows) [57]. We added two sources chosen for their structure. The Bosch CNC machining data contain vibration recordings from three production milling machines across six half-year timeframes [58]; we cloned the official repository at commit d60581d (1,702 recordings, 70 anomalous; the UCI listing reports 2,700 instances, a difference we could not resolve from public documentation), extracted 21 vibration features per recording with the project's existing script and verified 90 axis-level statistics against the source HDF5 files with no mismatch. The HAI 21.03 industrial control dataset records a hardware-in-the-loop testbed under scripted attacks [59]; we used its five attack sessions at commit 2a814ce, formed 13,400 non-overlapping 30-second windows with mean, standard deviation and change of 79 sensors and labelled a window as attacked when any second carried the source attack flag (330 attack windows in 50 attack events). Other candidates (TON_IoT, Edge-IIoTset, CIC IoT 2023, N-BaIoT, NASA C-MAPSS and SWaT) were registered but not acquired because their hosts were unreachable from the execution environment, registration was required or redistribution is forbidden; none would have added a structure not already covered. Leakage controls removed AI4I failure-mode flags and identifiers, both gas-turbine targets from the predictors, Bosch recording length and labels and all HAI label, session and event fields. The steel file was confirmed identical to a public mirror whose preparation script asserts exactly one defect flag per row before collapsing them to a class label."
+  },
+  {
+   "type": "p",
+   "text": "Each record was assigned to training, calibration or test by an independent coin flip with probabilities 0.6, 0.2 and 0.2, which the privacy argument below requires. Where no natural client identity exists (AI4I, SECOM, steel, power, gas, RT-IoT), four clients were simulated by Dirichlet label skew with concentration 0.5 and are described as simulated partitions. Bosch was evaluated in three designs: three machine clients with random roles; a later-period design in which recordings to February 2020 form the federation and later recordings are tested; and leave-one-machine-out, in which two machines form the federation and the third is unseen. HAI used sessions test1 to test3 as clients with roles assigned in contiguous ten-minute blocks and sessions test4 and test5 recorded two weeks later as a later-session test. The gas-turbine federation used 2011 to 2013, with 2014 and 2015 as out-of-period tests. Feature scaling used medians and interquartile ranges from pooled training rows, which we treat as public metadata; this is disclosed as an assumption."
+  },
+  {
+   "type": "table",
+   "caption": "**Table 2.** Datasets, provenance and evaluation designs. All licences permit research use with attribution.",
+   "header": [
+    "Task",
+    "Source and licence",
+    "Records",
+    "Features",
+    "Target",
+    "Evidence",
+    "Clients and test designs"
+   ],
+   "widths": [
+    1.5,
+    2.1,
+    0.9,
+    0.8,
+    1.6,
+    1.5,
+    2.4
+   ],
+   "rows": [
+    [
+     "AI4I 2020 Predictive Maintenance",
+     "UCI 601; CC BY 4.0",
+     "10,000",
+     "8",
+     "Machine failure (binary)",
+     "Synthetic",
+     "Simulated Dirichlet federation; i.i.d. test"
+    ],
+    [
+     "Steel Plates Faults",
+     "UCI 198; CC BY 4.0",
+     "1,941",
+     "27",
+     "Seven defect classes collapsed from one-hot flags (mirror script asserts one flag per row)",
+     "Observed industrial measurements",
+     "Simulated federation; selective classification"
+    ],
+    [
+     "SECOM",
+     "UCI 179; CC BY 4.0",
+     "1,567",
+     "590",
+     "Fail (binary)",
+     "Observed industrial measurements",
+     "Simulated federation; i.i.d. test"
+    ],
+    [
+     "Combined Cycle Power Plant",
+     "UCI 294; CC BY 4.0",
+     "9,568",
+     "4",
+     "PE (MW)",
+     "Observed plant measurements",
+     "Simulated federation; prediction intervals"
+    ],
+    [
+     "Gas Turbine CO and NOx Emissions",
+     "UCI 551; CC BY 4.0",
+     "36,733",
+     "9",
+     "NOX (mg/m3)",
+     "Observed turbine measurements",
+     "Federation on 2011-2013; out-of-period tests 2014 and 2015; recalibration on 2014"
+    ],
+    [
+     "RT-IoT2022",
+     "UCI 942; CC BY 4.0",
+     "123,117",
+     "96",
+     "Attack (binary",
+     "Observed IoT testbed traffic with generated attacks",
+     "Simulated federation; i.i.d. test"
+    ],
+    [
+     "Bosch CNC Machining",
+     "GitHub boschresearch/CNC_Machining (UCI 752); CC BY 4.0 (data); BSD-3-Clause (code)",
+     "1,702",
+     "36",
+     "Anomaly (bad process label, binary)",
+     "Observed vibration of three production CNC machines",
+     "Machine federation; later-period test; leave-one-machine-out"
+    ],
+    [
+     "HAI 21.03 industrial control security",
+     "GitHub icsdataset/hai, version 21.03; CC BY-SA 4.0",
+     "13,400",
+     "237",
+     "Attack window (binary",
+     "Hardware-in-the-loop testbed with scripted attacks",
+     "Session federation; later sessions test4-test5; event detection delay"
+    ]
+   ]
+  },
+  {
+   "type": "h2",
+   "text": "Models and federated training"
+  },
+  {
+   "type": "p",
+   "text": "All neural models were three-layer perceptrons with 64 and 32 hidden units, trained for 25 rounds of two local epochs with size-weighted averaging and batch size 64 (256 for RT-IoT because of its size). Baselines were a constant reference predictor, class-weighted logistic or ridge regression, a pooled centralised network, local-only networks per client, FedAvg [1], FedProx [32], SCAFFOLD [33], FedAvg with coordinate-wise median and with 25 per cent trimmed-mean aggregation [34] and DP-FedAvg at target budgets ε ∈ {1, 2, 4, 8} with δ = 10^-5^. Class weights were fixed from public prevalence figures so that the training loss did not depend on private label counts. Non-private local updates used batch-level gradient-norm clipping at 5 for numerical stability. Learning rates (and the FedProx coefficient, DP batch size, momentum and class weight) were selected on a separate tuning seed using an internal split of training rows only; the choices are listed in Appendix D and Table 3. The same records appear under different random partitions in tuning and confirmatory runs and the privacy cost of tuning [60] is not included in the reported budgets."
+  },
+  {
+   "type": "p",
+   "text": "Opacus could not be installed in the execution environment, so DP-SGD was implemented in NumPy. For a linear layer the per-example gradient is an outer product whose Frobenius norm is the product of the activation and error norms, so exact per-example clipping of the full parameter vector is computed without materialising per-example tensors. Each step used Poisson sampling at rate q = B/n~k~, clipping norm C = 1 and Gaussian noise with standard deviation σC. The noise multiplier σ for each client was set by bisection so that Google's dp_accounting RDP accountant for the Poisson-subsampled Gaussian mechanism reported the target ε after all local steps of all rounds; budgets compose over every step rather than restarting each round. Unit tests check the gradient against finite differences, the per-example norms against explicit computation, the noise scale and the calibrated budgets (Appendix F)."
+  },
+  {
+   "type": "table",
+   "caption": "**Table 3.** Fixed experimental settings (frozen before confirmatory runs).",
+   "header": [
+    "Component",
+    "Setting"
+   ],
+   "widths": [
+    1.5,
+    5
+   ],
+   "rows": [
+    [
+     "Roles",
+     "Independent per-record coin flips: training 0.6, calibration 0.2, test 0.2"
+    ],
+    [
+     "Clients",
+     "4 simulated (Dirichlet 0.5) where no natural identity; Bosch machines (3 or 2); HAI sessions (3)"
+    ],
+    [
+     "Model",
+     "Perceptron 64-32, ReLU; 25 rounds × 2 local epochs; batch 64 (RT-IoT 256); size-weighted averaging"
+    ],
+    [
+     "Baselines",
+     "Reference, linear, pooled network, local-only, FedAvg, FedProx, SCAFFOLD, median, trimmed mean, DP-FedAvg"
+    ],
+    [
+     "DP-SGD",
+     "Poisson sampling, per-example clip C = 1, Gaussian noise, RDP accountant; ε ∈ {1, 2, 4, 8}, δ = 10^-5^"
+    ],
+    [
+     "Secure aggregation",
+     "X25519, HKDF-SHA256, ChaCha20 masks, 32-bit modular sums; no dropout recovery"
+    ],
+    [
+     "Calibration",
+     "26 logit-spaced bins; Skellam noise with exact privacy profile; ε~C~ = ε of the model (4 for FedAvg)"
+    ],
+    [
+     "Targets",
+     "α~miss~ = 0.10, α~fa~ = 0.05, selective α = 0.10, interval α = 0.10; δ~test~ = 0.04, δ~count~ = 0.01 per side"
+    ],
+    [
+     "Seeds",
+     "1 to 10 (RT-IoT 1 to 5); tuning seed 0; sensitivity seeds 1 to 5"
+    ]
+   ]
+  },
+  {
+   "type": "h2",
+   "text": "Secure aggregation"
+  },
+  {
+   "type": "p",
+   "text": "We implemented the semi-honest pairwise-mask protocol of Bonawitz and colleagues without dropout recovery [44]. Each pair of clients derives a key by X25519 agreement and HKDF-SHA256, expands it with ChaCha20 into 32-bit masks and each client adds or subtracts its pair masks so that they cancel in the modular sum. Model parameters are encoded in fixed point with scale 2^20^ after weighting by the public client share. The server learns only the sum; a client dropping out after masking leaves the sum unrecoverable, which a test confirms. The protocol runs in one process and therefore measures computation and message volume, not network latency. Secure aggregation protects against an honest-but-curious server; it does not protect against a malicious server, collusion with clients or poisoned inputs and it prevents the server from inspecting individual updates."
+  },
+  {
+   "type": "h2",
+   "text": "Private aggregate risk control"
+  },
+  {
+   "type": "p",
+   "text": "Let s(x) ∈ [0, 1] be the fault score of the shared model and b~0~ < b~1~ < … < b~B~ a grid fixed before seeing data (26 bins equally spaced on the logit scale between −8 and 8, with two open end bins). Each client k counts its calibration positives and negatives per bin and adds independent Skellam(μ/K, μ/K) noise to every count. Because the sum of independent Skellam variables is Skellam, the secure sum over K clients carries Skellam(μ, μ) noise per bin. The server forms the noisy cumulative count of positives below the j-th edge, m̃~j~ and the noisy total of positives Ñ~1~. The miss risk of an automatic-pass threshold t is R(t) = P(s(X) < t | Y = 1), which rises with t. For each j in increasing order the server computes"
+  },
+  {
+   "type": "eq",
+   "text": "p~j~ = P( Bin(n⁻, α~miss~) + Z~j~ ≤ m̃~j~ ),   Z~j~ ~ Skellam(jμ, jμ),   n⁻ = Ñ~1~ − q~1−δc~(Skellam(Bμ, Bμ))"
+  },
+  {
+   "type": "p",
+   "text": "by exact convolution and admits bin j while p~j~ ≤ δ~test~. Without noise p~j~ reduces to the exact binomial tail that underlies the Clopper–Pearson bound [61]. The automatic-pass threshold t~low~ is the upper edge of the last admitted bin. The automatic-alarm threshold t~high~ is certified in the same way from the top of the negative histogram with target α~fa~. Scores below t~low~ pass, scores at or above t~high~ raise an alarm and the remainder are escalated. Figure 2 shows the complete protocol. The same scan certifies selective classification for steel (risk: an accepted prediction that is wrong) and prediction intervals for regression (risk: an absolute residual outside the interval). We used α~miss~ = 0.10, α~fa~ = 0.05, α = 0.10 for selection and intervals, δ~test~ = 0.04 and δ~count~ = 0.01 per side, fixed before the confirmatory runs."
+  },
+  {
+   "type": "p",
+   "text": "**Proposition 1 (validity).** Suppose calibration positives and future positives are exchangeable, the grid is fixed in advance and the noise is as stated. Then P(R(t~low~) > α~miss~) ≤ δ~test~ + δ~count~ and the same bound holds for the false-alarm rate, so both targets hold jointly with probability at least 1 − 2(δ~test~ + δ~count~) = 0.90. The proof (Appendix A) uses three facts: the first bin index j∗ at which the true risk exceeds α~miss~ is fixed, so an error requires rejecting that single null; the binomial-Skellam convolution is a super-uniform p-value because Bin(n, R) is stochastically larger than Bin(n, α) when R > α; and replacing the true count n~1~ by its lower confidence bound n⁻ can only increase the p-value."
+  },
+  {
+   "type": "p",
+   "text": "**Proposition 2 (privacy of the pipeline).** Under add-or-remove adjacency, if DP-FedAvg gives each training record an (ε~T~, δ) guarantee and the Skellam histogram release gives each calibration record an (ε~C~, δ) guarantee, then the released model and noisy histograms together satisfy (max(ε~T~, ε~C~), δ) for every record, provided roles are assigned by independent per-record coin flips. A record influences either the training mechanism or the calibration mechanism directly, never both and the calibration release depends on the training data only through the already released model. We calibrate μ so that the exact hockey-stick divergence of the shifted Skellam pair gives ε~C~ = ε~T~. If records could be used in both roles, sequential RDP composition applies and we report that value as well."
+  },
+  {
+   "type": "p",
+   "text": "**Proposition 3 (evidence floor).** Without noise, no automatic-pass region can be certified unless the calibration set holds at least ⌈ln δ~test~ / ln(1 − α~miss~)⌉ = 31 faults at the chosen settings, because even zero missed faults among fewer cases leave a p-value above δ~test~. With noise we report the smallest count at which a noisy count of zero is admitted at the lower count bound, computed exactly. The floor depends only on the evidence and the targets, so it binds every certified method including non-private ones."
+  },
+  {
+   "type": "p",
+   "text": "Ablations remove one component at a time: the private plug-in rule admits bins while m̃~j~/Ñ~1~ ≤ α; the uncorrected rule applies the exact binomial test to noisy counts as if they were exact; and the non-private rules (plug-in and Learn-then-Test) use exact counts. A default rule passes scores below 0.5 and alarms above. Private histograms also yield binned probabilities (p̂ = (pos + 0.5)/(pos + neg + 1) per bin) at no extra privacy cost, which we compare with raw scores by expected calibration error (ECE)."
+  },
+  {
+   "type": "figure",
+   "path": "../Figures/Architecture and Protocol.png",
+   "alt": "Private aggregate risk control. Clients train with DP-SGD and release Skellam-noised histograms of calibration scores th",
+   "caption": "**Figure 2.** Private aggregate risk control. Clients train with DP-SGD and release Skellam-noised histograms of calibration scores through pairwise-mask secure summation; the server certifies thresholds with a noise-aware fixed-sequence test and sites route scores between the thresholds to people."
+  },
+  {
+   "type": "h2",
+   "text": "Threat model and attacks"
+  },
+  {
+   "type": "p",
+   "text": "The privacy adversary is an honest-but-curious server or an outside party with access to the released model, which may run membership inference. We evaluated the loss-threshold attack [39] on members (training rows) and non-members (test rows), reporting area under the curve, the maximum true-minus-false positive difference (attack advantage) and the true positive rate at 1 per cent false positives [40], overall and for the rare class. For update leakage we recovered single records analytically from first-layer gradients of a one-record update, without protection, with clipping only and with clipping and Gaussian noise [41,42]. The integrity adversary controls one client and sends a sign-flipped update scaled by four, or controls one client's calibration counts and adds fabricated high-score faults. We also flipped 30 per cent of one client's labels and halved participation, conditions that earlier work by the author examined for federated credit-risk models [62], corrupted test features with Gaussian noise or missing values, varied heterogeneity, client count and participation and varied the bin count. These attacks are bounded laboratory simulations; they do not represent an adaptive adversary."
+  },
+  {
+   "type": "h2",
+   "text": "Outcomes and statistical analysis"
+  },
+  {
+   "type": "p",
+   "text": "Primary utility metrics were precision-recall area under the curve (PR-AUC) for binary tasks, macro F1 for steel and root mean square error (RMSE) in physical units for regression, with balanced accuracy, Matthews correlation, rare-event recall, Brier score, log loss, ECE, mean absolute error and R^2^ as secondary metrics. Decision metrics were the realised miss rate among test faults, the false-alarm rate among normal records, the escalation rate, selective joint error and interval coverage. Confirmatory runs used seeds 1 to 10 (1 to 5 for RT-IoT), paired across methods. Seeds vary partitions, initialisation and noise for a fixed dataset; intervals over seeds therefore describe that variation and not variation over industrial sites. We report means with percentile bootstrap intervals (10,000 resamples), paired differences with Wilcoxon signed-rank tests and Benjamini–Hochberg control within each table [63], an exact one-sided McNemar test for H2, a bootstrap test against the five-point margin for H3 and a one-sided Wilcoxon test for H4, with Holm adjustment across H2 to H4 [64]. After the confirmatory runs we added run-clustered versions of the H2 and H4 tests as secondary checks, because model combinations within a run share one data partition; this and the calibration-only sweep are recorded as protocol deviations. H1 was assessed in a Monte Carlo study with 1,000 replications per condition, two known score distributions, 30, 100 and 400 calibration positives and ten negatives per positive."
+  },
+  {
+   "type": "h2",
+   "text": "Reproducibility"
+  },
+  {
+   "type": "p",
+   "text": "Code, configuration, tuned hyperparameters, tests, derived data tables and every run output are in the public repository Imomazin/research-projects, folder Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six. The protocol was frozen in commit 1dc2dbf before any confirmatory seed ran; one later deviation is recorded in Protocol Deviations.md. Software versions were Python 3.13.17, NumPy 2.5.3, pandas 3.0.5, SciPy 1.18.1, scikit-learn 1.9.1, dp-accounting 0.6.0 and cryptography 50.0.1 on a two-core Linux virtual machine without a GPU."
+  },
+  {
+   "type": "h1",
+   "text": "Results"
+  },
+  {
+   "type": "h2",
+   "text": "RQ1: privacy budgets and utility"
+  },
+  {
+   "type": "p",
+   "text": "Formal privacy reduced utility most where the target class was rare and least where the signal was strong or continuous (Table 4, Figure 3). On AI4I maintenance the PR-AUC of FedAvg was 0.581 (95% interval 0.510 to 0.645); DP-FedAvg reached 0.297 at ε = 8, 0.264 at ε = 4 and 0.096 at ε = 1, against a prevalence reference of 0.033. The three Bosch designs followed the same pattern: with machine clients FedAvg reached 0.785 and DP-FedAvg 0.406, 0.292 and 0.076 at ε = 8, 4 and 1. On HAI the corresponding values were 0.543, 0.390, 0.269 and 0.036. Macro F1 for steel fell from 0.733 to 0.618, 0.503 and 0.286. Regression lost much less: power-plant RMSE moved from 4.28 MW under FedAvg to 4.34 MW at ε = 4 and 5.26 MW at ε = 1 and gas-turbine RMSE from 4.91 to 5.29 and 5.97 mg/m^3^. RT-IoT2022, where attacks are the majority class, stayed close to ceiling (PR-AUC 1.000 without and 0.997 with ε = 1). SECOM was hard for every method: the best PR-AUC was 0.154 for logistic regression against a reference of 0.062 and DP models were close to the reference."
+  },
+  {
+   "type": "p",
+   "text": "The loss is concentrated in the minority class, as predicted by the disparate-impact result for DP-SGD [9]. Expressed as a share of FedAvg utility, DP-FedAvg at ε = 4 retained 45% on AI4I, 37% on Bosch machines, 50% on HAI and 69% on steel, while regression error rose by 1.5% for power and 7.8% for gas. The pooled network was the strongest neural model on AI4I (0.739) and the linear model was competitive on Bosch and best on SECOM, so the gap between federated and pooled learning is task-specific and the linear reference remains necessary."
+  },
+  {
+   "type": "table",
+   "caption": "**Table 4.** Held-out utility by method (mean over seeds; 95% bootstrap intervals in the workbook). Higher is better except RMSE.",
+   "header": [
+    "Task",
+    "Ref.",
+    "Linear",
+    "Pooled",
+    "FedAvg",
+    "FedProx",
+    "SCAFFOLD",
+    "Median",
+    "DP ε=8",
+    "DP ε=4",
+    "DP ε=1"
+   ],
+   "widths": [
+    2.2,
+    0.8,
+    0.8,
+    0.8,
+    0.8,
+    0.8,
+    0.8,
+    0.8,
+    0.8,
+    0.8,
+    0.8
+   ],
+   "rows": [
+    [
+     "AI4I (PR-AUC)",
+     "0.033",
+     "0.412",
+     "0.739",
+     "0.581",
+     "0.567",
+     "0.530",
+     "0.607",
+     "0.297",
+     "0.264",
+     "0.096"
+    ],
+    [
+     "SECOM (PR-AUC)",
+     "0.062",
+     "0.154",
+     "0.156",
+     "0.102",
+     "0.104",
+     "0.128",
+     "0.146",
+     "0.087",
+     "0.069",
+     "0.064"
+    ],
+    [
+     "Steel (macro F1)",
+     "0.074",
+     "0.641",
+     "0.742",
+     "0.733",
+     "0.645",
+     "0.668",
+     "0.681",
+     "0.618",
+     "0.503",
+     "0.286"
+    ],
+    [
+     "Power (RMSE, MW)",
+     "17.07",
+     "4.58",
+     "4.16",
+     "4.28",
+     "4.28",
+     "4.37",
+     "4.37",
+     "4.30",
+     "4.34",
+     "5.26"
+    ],
+    [
+     "Gas NOx (RMSE, mg/m^3^)",
+     "11.03",
+     "7.96",
+     "4.43",
+     "4.91",
+     "4.99",
+     "4.99",
+     "5.00",
+     "5.26",
+     "5.29",
+     "5.97"
+    ],
+    [
+     "RT-IoT (PR-AUC)",
+     "0.899",
+     "1.000",
+     "1.000",
+     "1.000",
+     "1.000",
+     "1.000",
+     "1.000",
+     "0.998",
+     "0.998",
+     "0.997"
+    ],
+    [
+     "Bosch machines (PR-AUC)",
+     "0.038",
+     "0.671",
+     "0.791",
+     "0.785",
+     "0.669",
+     "0.819",
+     "0.673",
+     "0.406",
+     "0.292",
+     "0.076"
+    ],
+    [
+     "Bosch early periods (PR-AUC)",
+     "0.050",
+     "0.864",
+     "0.888",
+     "0.904",
+     "0.841",
+     "0.877",
+     "0.835",
+     "0.551",
+     "0.349",
+     "0.057"
+    ],
+    [
+     "Bosch two machines (PR-AUC)",
+     "0.044",
+     "0.801",
+     "0.780",
+     "0.801",
+     "0.780",
+     "0.816",
+     "0.803",
+     "0.518",
+     "0.378",
+     "0.065"
+    ],
+    [
+     "HAI sessions (PR-AUC)",
+     "0.024",
+     "0.498",
+     "0.553",
+     "0.543",
+     "0.544",
+     "0.612",
+     "0.517",
+     "0.390",
+     "0.269",
+     "0.036"
+    ]
+   ]
+  },
+  {
+   "type": "figure",
+   "path": "../Figures/Privacy Utility.png",
+   "alt": "Utility of DP-FedAvg by privacy budget (mean and 95% bootstrap interval over seeds) against FedAvg (dashed) and the pool",
+   "caption": "**Figure 3.** Utility of DP-FedAvg by privacy budget (mean and 95% bootstrap interval over seeds) against FedAvg (dashed) and the pooled network (dotted)."
+  },
+  {
+   "type": "h2",
+   "text": "RQ2: heterogeneity, clients and machines"
+  },
+  {
+   "type": "p",
+   "text": "Figure 4 compares all methods. Local-only models trained on one client's data underperformed the federated model on every simulated-client task except SECOM, where all neural models stayed near the reference; on AI4I the average local model reached a PR-AUC of 0.354 and the weakest 0.144, against 0.581 for FedAvg. The heterogeneity corrections did not improve on FedAvg consistently: FedProx was within 0.002 of FedAvg or below it on every task and SCAFFOLD was best on Bosch machines (0.819) and HAI (0.612) but lower on AI4I (0.530), where it diverged at larger learning rates during tuning. On AI4I, stronger label skew (Dirichlet 0.1) gave a FedAvg PR-AUC of 0.503 and weaker skew (2.0) gave 0.652; the DP model at ε = 4 moved from 0.332 to 0.359. Doubling the number of clients to eight gave 0.704 for FedAvg and 0.213 at ε = 4, because each DP client then has fewer records to average its noise over and half participation per round gave 0.330. Machine structure mattered more than simulated skew. A federation of two Bosch machines reached a PR-AUC of 0.369 on the unseen third machine against 0.801 on held-out recordings from the two training machines and later Bosch periods gave 0.265, so most of the apparent accuracy does not transfer across machines or across years. HAI was the exception: later sessions gave a PR-AUC of 0.656, close to the within-session value."
+  },
+  {
+   "type": "figure",
+   "path": "../Figures/Model Comparison.png",
+   "alt": "Held-out utility of all methods by task (mean and 95% bootstrap interval).",
+   "caption": "**Figure 4.** Held-out utility of all methods by task (mean and 95% bootstrap interval)."
+  },
+  {
+   "type": "h2",
+   "text": "RQ3: calibration, minority events and leakage"
+  },
+  {
+   "type": "p",
+   "text": "The default decision rule (pass below 0.5, alarm above) missed most faults once privacy was added. Under FedAvg its realised miss rate was 39.8% on AI4I, 28.4% on Bosch machines and 49.0% on HAI; under DP-FedAvg at ε = 4 it rose to 98.9%, 95.7% and 80.7%. Raw scores were miscalibrated where class weights were used (ECE 0.052 for FedAvg on AI4I and 0.162 on SECOM). The binned probabilities that come free with the private histograms reduced ECE to 0.008 and 0.040 respectively at no extra privacy cost; on tasks where the raw scores were already well calibrated the binned values were similar."
+  },
+  {
+   "type": "p",
+   "text": "Membership inference by loss threshold was close to chance overall: attack AUC ranged from 0.488 to 0.571 across tasks and models and the true positive rate at 1 per cent false positives stayed near 1 per cent. The rare class was different. Restricting the attack to fault records, the AUC for the non-private pooled model reached 0.987 on SECOM, 0.748 on HAI and 0.713 on Bosch machines and for FedAvg 0.796, 0.734 and 0.640; DP-FedAvg at ε = 4 brought these to 0.495, 0.560 and 0.591. These rare-class estimates rest on 10 to 40 fault records per run and are therefore imprecise, but they locate the privacy risk where the industrial value lies: in the few recorded failures. Update leakage was severe without protection: from a single-record update the first-layer gradients recovered the AI4I input exactly (median cosine similarity 1.000, share above 0.99 100%) and clipping alone did not change this (median cosine 1.000) because clipping rescales but does not perturb the gradient. Adding Gaussian noise at multiplier 1 reduced the median cosine to -0.021. This is why DP noise is added on the client and why secure aggregation of updates is worth its small cost."
+  },
+  {
+   "type": "h2",
+   "text": "RQ4: validity and cost of private aggregate risk control"
+  },
+  {
+   "type": "p",
+   "text": "H1 was supported. In the Monte Carlo study (84 conditions of 1,000 replications each) the largest violation rate of PARC across all conditions was 1.0% for the miss target and 0.0% for the false-alarm target, below the stated 5 per cent per side. The private plug-in rule violated the miss target in up to 53.8% of replications and the uncorrected binomial rule in up to 10.7%, which shows that ignoring the privacy noise breaks the guarantee when calibration counts are small (Figure 8)."
+  },
+  {
+   "type": "p",
+   "text": "H2 was supported on the industrial data. Across 325 paired run-model combinations of the seven binary designs, the private plug-in rule exceeded the 10 per cent miss target on the held-out test rows in 39 cases and PARC in 1 (exact one-sided McNemar p = 3.6e-12, Holm-adjusted p = 3.6e-12). The non-private plug-in rule exceeded the target as often as its private version (39 cases) and non-private Learn-then-Test as rarely as PARC (1). Figure 5 shows the same ordering for false alarms: the share of runs above the 5 per cent target was 18.8% for the private plug-in rule and 1.5% for PARC. Test-set sampling contributes to these counts, so a run above the target does not by itself show that the population rate exceeded it. Because combinations within a run share one data partition, we also treated each of the 65 runs as a cluster: the plug-in rule exceeded the target more often than PARC in 25 runs and less often in none (sign test p = 3.0e-08)."
+  },
+  {
+   "type": "p",
+   "text": "H3 was supported in the form it was frozen, but the comparison turned out to say more about training than about calibration. At ε = 4 the escalation rate under PARC exceeded that of non-private Learn-then-Test on the same DP model by 0.12 percentage points on average (95% interval 0.01 to 0.25, 75 runs), far inside the five-point margin. Both rules escalated almost everything because the DP models placed too many faults at low scores for any automatic-pass region to be certified: escalation under PARC was 95.9% on AI4I, 97.0% on Bosch machines and 96.0% on HAI. The added calibration-only sweep isolates the cost of private calibration on the non-private FedAvg model. On AI4I the escalation rate under PARC was 38.4% at ε~C~ = 8, 39.4% at 4, 79.9% at 2, 95.3% at 1 and 96.5% at 0.5, against 38.4% for exact Learn-then-Test on the same model. On HAI the corresponding values were 94.7% at ε~C~ = 4 and 95.9% at 1 against 94.7%. Private calibration is therefore nearly free at ε~C~ ≥ 4 and costly at ε~C~ ≤ 1 on federations of this size, in line with the evidence floor."
+  },
+  {
+   "type": "p",
+   "text": "The evidence floor explains most escalation decisions. Certifying a 10 per cent miss rate requires at least 31 calibration faults without privacy, 36 at ε = 4, 62 at ε = 2 and 118 at ε = 1; certifying a 5 per cent false-alarm rate requires 63, 70, 108 and 198 normal records (Table 6). The federations held on average 72 calibration faults for AI4I, 41 for HAI, 21 for SECOM and 14, 11 and 9 for the three Bosch designs. SECOM and Bosch therefore sit below the floor at any budget and every certified method, private or not, escalated all faults there; AI4I and HAI clear it at ε = 4 or above. On AI4I with the FedAvg model, PARC automated 58.1% of decisions with a realised miss rate of 2.1% and a false-alarm rate of 3.1%; the private plug-in rule automated 86.3% with a miss rate of 9.1%, at the target on average and above it in many runs. On RT-IoT2022, with more than 20,000 calibration attacks, all certified rules automated every decision with realised miss rates of 6.5% under FedAvg and 3.2% under DP at ε = 1."
+  },
+  {
+   "type": "p",
+   "text": "For steel, selective classification under PARC accepted 52.0% of plates for the FedAvg model with a joint error of 6.1% against a target of 10 per cent; the default rule accepted all plates with 28.3% errors and DP models at ε = 4 or below could not certify any acceptance region. Private prediction intervals for regression achieved in-period coverage of 92.6% for power (half-width 7.25 MW) and 91.7% for gas (half-width 8.07 mg/m^3^) at a 90 per cent target, with interval width growing as ε fell (power 9.46 MW at ε = 1)."
+  },
+  {
+   "type": "table",
+   "caption": "**Table 5.** Realised miss rate / escalation rate on held-out records by certification rule (target miss rate 10%; calibration ε = 4).",
+   "header": [
+    "Task and model",
+    "Default 0.5",
+    "Plug-in, exact",
+    "LTT, exact",
+    "Plug-in, private",
+    "Binomial, no noise term",
+    "PARC"
+   ],
+   "widths": [
+    1.6,
+    1.1,
+    1.1,
+    1.1,
+    1.1,
+    1.1,
+    1.1
+   ],
+   "rows": [
+    [
+     "AI4I, FedAvg",
+     "39.8% / 0%",
+     "9.5% / 13%",
+     "2.1% / 41%",
+     "9.1% / 14%",
+     "1.4% / 42%",
+     "2.1% / 42%"
+    ],
+    [
+     "AI4I, DP ε=4",
+     "98.9% / 0%",
+     "1.5% / 89%",
+     "0.0% / 96%",
+     "1.5% / 89%",
+     "0.0% / 96%",
+     "0.0% / 96%"
+    ],
+    [
+     "HAI, FedAvg",
+     "49.0% / 0%",
+     "5.7% / 76%",
+     "0.0% / 95%",
+     "5.2% / 77%",
+     "0.0% / 95%",
+     "0.0% / 95%"
+    ],
+    [
+     "HAI, DP ε=4",
+     "80.7% / 0%",
+     "0.0% / 95%",
+     "0.0% / 96%",
+     "0.0% / 95%",
+     "0.0% / 96%",
+     "0.0% / 96%"
+    ],
+    [
+     "Bosch, FedAvg",
+     "28.4% / 0%",
+     "7.5% / 40%",
+     "0.0% / 94%",
+     "6.8% / 40%",
+     "0.0% / 94%",
+     "0.7% / 86%"
+    ],
+    [
+     "Bosch, DP ε=4",
+     "95.7% / 0%",
+     "1.7% / 90%",
+     "0.0% / 97%",
+     "1.7% / 90%",
+     "0.0% / 97%",
+     "0.0% / 97%"
+    ],
+    [
+     "RT-IoT, FedAvg",
+     "0.4% / 0%",
+     "6.5% / 0%",
+     "6.5% / 0%",
+     "6.5% / 0%",
+     "6.5% / 0%",
+     "6.5% / 0%"
+    ],
+    [
+     "RT-IoT, DP ε=4",
+     "0.2% / 0%",
+     "3.3% / 0%",
+     "3.3% / 0%",
+     "3.3% / 0%",
+     "3.3% / 0%",
+     "3.3% / 0%"
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "caption": "**Table 6.** Evidence floor: smallest calibration count at which any automatic region can be certified (exact computation; δ~test~ = 0.04, δ~count~ = 0.01).",
+   "header": [
+    "Target",
+    "Non-private",
+    "ε = 8",
+    "ε = 4",
+    "ε = 2",
+    "ε = 1",
+    "ε = 0.5"
+   ],
+   "widths": [
+    2,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "rows": [
+    [
+     "miss rate 0.10",
+     "31",
+     "32",
+     "36",
+     "62",
+     "118",
+     "221"
+    ],
+    [
+     "false-alarm rate 0.05",
+     "63",
+     "64",
+     "70",
+     "108",
+     "198",
+     "361"
+    ],
+    [
+     "miss rate 0.20",
+     "15",
+     "16",
+     "20",
+     "38",
+     "78",
+     "150"
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "caption": "**Table 7.** Pre-specified confirmatory tests (Holm adjustment across H2 to H4).",
+   "header": [
+    "Hypothesis",
+    "Evidence",
+    "Test",
+    "Result"
+   ],
+   "widths": [
+    2,
+    3,
+    2,
+    1.6
+   ],
+   "rows": [
+    [
+     "H1 validity with known distributions",
+     "Worst PARC violation 1.0% (miss), 0.0% (false alarm); plug-in up to 53.8%",
+     "84 Monte Carlo conditions × 1,000",
+     "Supported"
+    ],
+    [
+     "H2 fewer exceedances than private plug-in",
+     "1 vs 39 of 325 runs",
+     "Exact McNemar, adjusted p = 3.6e-12",
+     "Supported"
+    ],
+    [
+     "H3 extra escalation < 5 points at ε = 4",
+     "Mean 0.12 points (95% CI 0.01 to 0.25)",
+     "Bootstrap against margin",
+     "Supported; uninformative (both near full escalation)"
+    ],
+    [
+     "H4 higher risk under shift",
+     "Mean rise 23.0 points (95% CI 19.4 to 26.7); carried by gas",
+     "Wilcoxon, adjusted p = 2.7e-18",
+     "Supported for gas; untested where all faults escalated"
+    ]
+   ]
+  },
+  {
+   "type": "figure",
+   "path": "../Figures/Ablation of Certification Rules.png",
+   "alt": "Realised miss rate, false-alarm rate and escalation by certification rule for FedAvg models across the seven binary desi",
+   "caption": "**Figure 5.** Realised miss rate, false-alarm rate and escalation by certification rule for FedAvg models across the seven binary designs (points are runs; bars are means; percentages are the share of runs above target)."
+  },
+  {
+   "type": "h2",
+   "text": "RQ5: shift, unseen machines and attacks"
+  },
+  {
+   "type": "p",
+   "text": "H4 was supported overall (mean rise in realised risk 23.0 percentage points, 95% interval 19.4 to 26.7, 250 pairs, Holm-adjusted p = 2.7e-18) but the effect came from the gas turbine (Figure 6). Intervals certified on 2011 to 2013 had realised risk 44.2 percentage points higher on the 2014 records and 69.8 percentage points higher on the 2015 records than on in-period records and recalibrating on 2014 with PARC restored coverage of 2015 only to 65.0% for FedAvg. RMSE rose from 4.91 mg/m^3^ in period to 17.74 in 2015. On Bosch and HAI the miss rate under PARC did not rise because the protocol had escalated every fault in the first place, so these designs do not test the guarantee under shift. They do show that escalation protects the miss rate when evidence is thin, at the price of human review. Averaging differences within runs (40 clusters) gave a mean rise of 14.4 percentage points (Wilcoxon p = 0.0017) and without the gas turbine the mean rise was 0.2 percentage points."
+  },
+  {
+   "type": "p",
+   "text": "On the later HAI sessions, all 17 attack events were flagged (alarm or escalation) by the FedAvg model under PARC and 100.0% raised an automatic alarm, with a median delay to the first alarm of 28.5 s; 7.8% of normal windows raised an alarm. With DP at ε = 4 automatic alarms covered 71.2% of events with a median delay of 53.1 s. A single malicious AI4I client sending a scaled sign-flipped update reduced FedAvg to a PR-AUC of 0.310; coordinate-wise median and trimmed-mean aggregation gave 0.309 and 0.309 and DP-FedAvg with secure aggregation, which cannot screen updates, gave 0.202. Fabricated high-score faults in one client's calibration counts inflate the denominator of the miss rate; on AI4I at ε = 4 the realised miss rate under PARC was 1.5%, 1.5%, 2.9% and 6.7% for fabricated counts of 0.25, 0.5, 1 and 2 times the true number of calibration faults, while escalation fell to 66.7% at the largest level. Test-time sensor corruption reduced FedAvg PR-AUC to 0.067 with Gaussian noise of one standard deviation and 0.203 with 40 per cent missing values, with realised miss rates under PARC of 10.1% and 17.5%. Flipping 30 per cent of one client's labels gave a PR-AUC of 0.527 (Figure 7 and Table 8)."
+  },
+  {
+   "type": "figure",
+   "path": "../Figures/Shift and Unseen Machines.png",
+   "alt": "Realised risk under PARC in period and under shift (FedAvg; dashed line marks the 10% target).",
+   "caption": "**Figure 6.** Realised risk under PARC in period and under shift (FedAvg; dashed line marks the 10% target)."
+  },
+  {
+   "type": "table",
+   "caption": "**Table 8.** Sensitivity and attack experiments (seeds 1 to 5; PR-AUC on held-out records; PARC outcomes for FedAvg at calibration ε = 4).",
+   "header": [
+    "Condition",
+    "FedAvg",
+    "Trimmed",
+    "Median",
+    "DP ε=4",
+    "PARC miss",
+    "PARC escalated"
+   ],
+   "widths": [
+    2.6,
+    0.9,
+    0.9,
+    0.9,
+    0.9,
+    1,
+    1.1
+   ],
+   "rows": [
+    [
+     "Dirichlet 0.1",
+     "0.503",
+     "n/a",
+     "n/a",
+     "0.332",
+     "0.3%",
+     "64%"
+    ],
+    [
+     "Dirichlet 2.0",
+     "0.652",
+     "n/a",
+     "n/a",
+     "0.359",
+     "1.7%",
+     "45%"
+    ],
+    [
+     "Eight clients",
+     "0.704",
+     "n/a",
+     "n/a",
+     "0.213",
+     "0.8%",
+     "37%"
+    ],
+    [
+     "Half participation",
+     "0.330",
+     "n/a",
+     "n/a",
+     "0.034",
+     "1.6%",
+     "50%"
+    ],
+    [
+     "30% labels flipped at one client",
+     "0.527",
+     "n/a",
+     "n/a",
+     "0.231",
+     "0.0%",
+     "83%"
+    ],
+    [
+     "One malicious client",
+     "0.310",
+     "0.309",
+     "0.309",
+     "0.202",
+     "0.4%",
+     "84%"
+    ],
+    [
+     "13 bins",
+     "0.600",
+     "n/a",
+     "n/a",
+     "0.336",
+     "1.2%",
+     "42%"
+    ],
+    [
+     "51 bins",
+     "0.600",
+     "n/a",
+     "n/a",
+     "0.336",
+     "1.2%",
+     "43%"
+    ],
+    [
+     "Bosch: one malicious machine",
+     "0.034",
+     "0.035",
+     "0.155",
+     "0.031",
+     "0.0%",
+     "100%"
+    ],
+    [
+     "HAI: one malicious session",
+     "0.039",
+     "0.043",
+     "0.314",
+     "0.095",
+     "0.0%",
+     "98%"
+    ]
+   ]
+  },
+  {
+   "type": "figure",
+   "path": "../Figures/Robustness Under Attack and Corruption.png",
+   "alt": "Sensitivity analyses, means over seeds 1 to 5. (a) Label skew on AI4I. (b) PR-AUC with and without one client sending a ",
+   "caption": "**Figure 7.** Sensitivity analyses, means over seeds 1 to 5. (a) Label skew on AI4I. (b) PR-AUC with and without one client sending a scaled sign-flipped update. (c) Realised miss rate under PARC when one client fabricates high-score faults in its calibration counts. (d) FedAvg PR-AUC under Gaussian sensor noise and missing values at test time."
+  },
+  {
+   "type": "h2",
+   "text": "Privacy accounting and cost"
+  },
+  {
+   "type": "p",
+   "text": "Every DP model met its target: the largest per-client training budget was 4.000 at the ε = 4 setting and 1.000 at ε = 1 (Table 9). The Skellam parameter needed for ε~C~ = ε was μ = 5.54 at ε = 1, 0.92 at ε = 2 and 0.055 at ε = 4. Because roles are assigned record by record, the pipeline budget equals the training budget; if the same records served both roles, sequential composition would give up to 6.97 at the ε = 4 setting and 1.50 at ε = 1. Without secure aggregation each client's own noise share would give its calibration records only ε = 5.28 instead of 4 and the same value applies if all other clients collude with the server. Costs were small at this model size (Table 10): one DP-FedAvg training run took 0.97 s on AI4I and 10.38 s on RT-IoT2022 on one core, secure aggregation of model updates added 0.05 s and 512 bytes of key exchange per training run and the calibration release sent 3,008 bytes in total. These are in-process measurements, not network measurements."
+  },
+  {
+   "type": "table",
+   "caption": "**Table 9.** Privacy accounting (record level, δ = 10^-5^; ranges over clients and runs).",
+   "header": [
+    "Target ε",
+    "Max training ε",
+    "Skellam μ",
+    "ε~C~ with SecAgg",
+    "ε~C~ without SecAgg",
+    "Pipeline ε",
+    "Sequential ε (δ = 2×10^-5^)"
+   ],
+   "widths": [
+    1,
+    1.2,
+    1,
+    1.2,
+    1.3,
+    1,
+    1.5
+   ],
+   "rows": [
+    [
+     "1",
+     "1.000",
+     "5.538",
+     "1.00",
+     "1.34 to 1.74",
+     "1.00",
+     "1.50"
+    ],
+    [
+     "2",
+     "2.000",
+     "0.922",
+     "2.00",
+     "2.44 to 2.95",
+     "2.00",
+     "3.15"
+    ],
+    [
+     "4",
+     "4.000",
+     "0.055",
+     "4.00",
+     "4.67 to 5.28",
+     "4.00",
+     "6.97"
+    ],
+    [
+     "8",
+     "8.000",
+     "0.001",
+     "7.59",
+     "8.27 to 8.95",
+     "8.00",
+     "14.69"
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "caption": "**Table 10.** Computation and communication per training run (mean over seeds; one CPU core; in-process measurement).",
+   "header": [
+    "Task",
+    "FedAvg s",
+    "DP ε=4 s",
+    "SecAgg s",
+    "Model bytes up",
+    "SecAgg key bytes",
+    "Calibration bytes"
+   ],
+   "widths": [
+    1.8,
+    0.9,
+    0.9,
+    0.9,
+    1.4,
+    1.2,
+    1.2
+   ],
+   "rows": [
+    [
+     "AI4I",
+     "1.14",
+     "0.97",
+     "0.051",
+     "1,075,600",
+     "512",
+     "3,008"
+    ],
+    [
+     "SECOM",
+     "0.45",
+     "0.91",
+     "0.245",
+     "12,257,680",
+     "512",
+     "3,008"
+    ],
+    [
+     "Steel",
+     "0.32",
+     "0.36",
+     "0.063",
+     "1,641,200",
+     "512",
+     "2,240"
+    ],
+    [
+     "Power",
+     "0.88",
+     "0.94",
+     "0.054",
+     "973,200",
+     "512",
+     "4,400"
+    ],
+    [
+     "Gas",
+     "2.15",
+     "2.03",
+     "0.053",
+     "1,101,200",
+     "512",
+     "4,400"
+    ],
+    [
+     "RT-IoT",
+     "7.66",
+     "10.38",
+     "0.092",
+     "3,251,600",
+     "512",
+     "3,008"
+    ],
+    [
+     "HAI",
+     "1.30",
+     "3.73",
+     "0.085",
+     "4,128,300",
+     "288",
+     "2,160"
+    ]
+   ]
+  },
+  {
+   "type": "figure",
+   "path": "../Figures/Guarantee Validity and Evidence Floor.png",
+   "alt": "Left: worst miss-rate violation rate of each rule across Monte Carlo conditions (dashed line at the 5 per cent per-side ",
+   "caption": "**Figure 8.** Left: worst miss-rate violation rate of each rule across Monte Carlo conditions (dashed line at the 5 per cent per-side allowance). Centre: minimum calibration events needed to certify each target, by calibration budget (log scale). Right: share of decisions automated by PARC on the non-private FedAvg model as the calibration budget varies (seeds 1 to 5)."
+  },
+  {
+   "type": "h1",
+   "text": "Discussion"
+  },
+  {
+   "type": "p",
+   "text": "The answer to the opening question is a qualified yes. Industrial sites can learn together under formal record-level privacy and can certify where automated decisions stay within stated error rates, with calibration that never exposes an unprotected statistic to the server. Whether that certification leaves much for automation depends on two quantities that are easy to measure before deployment: how well the shared model ranks rare events and how many rare events the sites hold for calibration. The privacy mechanism changes both and on rare-fault tasks the training cost of privacy was the larger effect."
+  },
+  {
+   "type": "h2",
+   "text": "What the findings establish"
+  },
+  {
+   "type": "p",
+   "text": "First, guarantees are achievable and cheap where evidence is adequate. The Monte Carlo study and 325 paired industrial runs show that a noise-aware certificate keeps the miss rate within target where plug-in thresholds do not and the price of private calibration is small once a site holds well above the evidence floor (Figure 8). This matches the logic of Learn-then-Test [13] and private prediction sets [17] and extends it to distributed noise under secure aggregation [45,46]. Second, the binding constraint for rare industrial faults is the count of calibration events. The floor of 31 faults for a 10 per cent miss target exists without any privacy; privacy at ε = 1 raises it to 118. Bosch and SECOM fell below it and the correct response of a certified system was to escalate. Third, DP training at budgets common in the literature weakened rare-event ranking enough that certification failed even when calibration was exact, consistent with the disparate impact of DP-SGD [9]. Fourth, the guarantee is exchangeability-bound: drift in the gas turbine broke interval coverage and recalibration on the latest year did not repair it, so certified thresholds have a shelf life that must be managed."
+  },
+  {
+   "type": "h2",
+   "text": "Mechanism: why the method succeeds or fails"
+  },
+  {
+   "type": "p",
+   "text": "PARC succeeds when three conditions hold together: the shared model separates faults from normal operation in the region where automation is wanted, the calibration set holds enough events for the target and future data resemble calibration data. It fails safely when the first two conditions fail, because the scan stops and work moves to people. It fails unsafely when the third fails, because nothing in the certificate detects shift. The plug-in rule fails in a different way: it treats the empirical rate as the true rate, so its realised rate sits near the target on average and above it in a large share of runs (12% of industrial runs and up to 53.8% of Monte Carlo replications); adding privacy noise does not correct this. The uncorrected binomial rule shows a subtler failure; it is valid when counts are large but breaks for small counts once noise is added, which is exactly the rare-fault regime."
+  },
+  {
+   "type": "h2",
+   "text": "Industrial and managerial implications"
+  },
+  {
+   "type": "p",
+   "text": "Four operating rules follow. Sites should count calibration events before choosing a privacy budget: with fewer than about 36 faults per target in the pooled calibration set, a 10 per cent miss guarantee at ε = 4 cannot be certified and the federation should plan for full human review or relax the target (a 20 per cent target needs 20 faults at ε = 4). Privacy should be spent on training only where ranking survives it; on our rare-fault tasks, ε = 8 retained between half and four fifths of FedAvg's primary metric and ε = 1 retained little, whereas regression and majority-class detection kept most of their utility. Calibration should be private by default, since at ε~C~ of 4 or more it added almost no escalation on AI4I and HAI once evidence was adequate and it removes the server's view of per-site error statistics. Certificates should be dated and renewed: a governance process that recalibrates on recent data and monitors realised error is required and drift as large as the 2014 to 2015 gas-turbine change needs model retraining as well as recalibration. Escalation is the human-oversight channel required for high-risk systems by Article 14 of the AI Act [51] and recommended by the NIST AI RMF [50]; PARC makes its size measurable and attaches an error bound to the automated remainder."
+  },
+  {
+   "type": "h2",
+   "text": "What remains at risk after privacy is added"
+  },
+  {
+   "type": "p",
+   "text": "Differential privacy bounded membership inference on the rare class in our runs, but it did not protect against integrity attacks or drift. One malicious client cut FedAvg PR-AUC on AI4I from 0.581 to 0.310 and fabricated calibration counts raised the realised miss rate under PARC to 6.7% at the largest level tested, so the certificate holds only if clients report honest counts. Secure aggregation hides individual updates and calibration counts from the server, which also stops the server from screening them, so robust aggregation and input validation cannot be applied directly [2,36]. Range proofs on each client's counts or a bounded per-client contribution would close the calibration channel; we did not implement them. Formal privacy also does not cover the normalisation statistics, which we treated as public, or hyperparameter tuning [60]."
+  },
+  {
+   "type": "h2",
+   "text": "Implications for the Industry 6.0 discussion"
+  },
+  {
+   "type": "p",
+   "text": "Sources that use the Industry 6.0 label share an expectation that distributed, AI-driven control will cross organisational boundaries and that people will supervise automated judgement rather than operate machines [23–26]. Our evidence speaks to a precondition for that expectation and does not show that it is being met. Collaborative learning across sites can be made private with measurable cost and automated decisions can be bounded by certified error rates. The same evidence shows where the expectation is weakest: rare and high-consequence events, small data per site and drift. Under those conditions the certified system returns most decisions to people. An Industry 6.0 that keeps the human-centred commitments of Industry 5.0 [27,29] therefore depends on sites pooling enough evidence about failures, which is a data-governance problem as well as a technical one."
+  },
+  {
+   "type": "table",
+   "caption": "**Table 11.** Operational implications and their limits.",
+   "header": [
+    "Finding",
+    "Decision for operators",
+    "Owner",
+    "Limit of the evidence"
+   ],
+   "widths": [
+    2.3,
+    2.6,
+    1.2,
+    2.2
+   ],
+   "rows": [
+    [
+     "Certification needs ≥31 faults (10% target) without privacy, 36 at ε = 4, 118 at ε = 1",
+     "Count calibration events per target before setting ε; pool calibration across sites",
+     "Data governance lead",
+     "Floors assume the stated δ and a 26-bin grid"
+    ],
+    [
+     "Plug-in thresholds exceed targets in about one run in eight",
+     "Use certified thresholds for any automated stop or pass",
+     "Reliability engineering",
+     "Measured on eight public tasks"
+    ],
+    [
+     "DP training at ε ≤ 4 erodes rare-fault ranking",
+     "Spend privacy on calibration first; test ranking at the chosen ε before deployment",
+     "Model owner",
+     "Small networks; tuning not privatised"
+    ],
+    [
+     "Drift breaks interval coverage (gas 2014 and 2015)",
+     "Date certificates; recalibrate and retrain on schedule; monitor realised error",
+     "Operations manager",
+     "One turbine"
+    ],
+    [
+     "Secure aggregation hides counts and updates from the server",
+     "Require client-side noise and bounded contributions; audit client software",
+     "Security team",
+     "No range proofs implemented"
+    ],
+    [
+     "Escalation carries most decisions for rare faults",
+     "Staff the review queue; record overrides for audit",
+     "Plant management",
+     "Human review quality not measured"
+    ]
+   ]
+  },
+  {
+   "type": "h2",
+   "text": "Limitations"
+  },
+  {
+   "type": "p",
+   "text": "The federation in six tasks is simulated by label skew; only Bosch machines and HAI sessions supply natural partitions and neither represents independent companies. AI4I is synthetic and RT-IoT2022 and HAI are testbeds. Calibration and test rows come from the same collection period except in the shift designs, so in-distribution guarantees may be optimistic for deployments. The 2015 gas-turbine year was inspected in an earlier pilot. Seed-level intervals do not measure variation across sites. The neural models are small; larger models may rank rare events better or memorise them more. DP-SGD was implemented in NumPy because Opacus was unavailable; its accounting used an established library and its mechanics are unit-tested, but it has not been audited externally. The membership attack is a simple loss threshold and the rare-class estimates rest on few records; stronger attacks would likely report higher leakage [40]. Secure aggregation was executed in one process without dropout recovery and with an honest-but-curious server. The poisoning experiments use one fixed attack. Hyperparameter tuning and normalisation are outside the privacy accounting. Several candidate datasets could not be acquired from the execution environment. Finally, the pilot results recorded earlier in the repository could not be re-verified because their workflow artefacts were not accessible and they are not used here."
+  },
+  {
+   "type": "h1",
+   "text": "Conclusions"
+  },
+  {
+   "type": "p",
+   "text": "Private aggregate risk control lets industrial sites certify, from calibration data protected by client-side Skellam noise and secure aggregation, which automated pass and alarm decisions stay within stated miss and false-alarm rates. The certificate was valid in simulation and on industrial data and private calibration cost little where calibration evidence was adequate. Rare-fault tasks exposed the real limits: DP training weakened ranking of the events that matter most and the number of recorded faults set a hard floor on what any certified method can automate. Practitioners should measure evidence before choosing budgets, keep calibration private, renew certificates as data drift and treat escalation as the designed channel for human oversight. Future work should test the protocol across independent organisations, add verifiable bounds on client contributions and study shift-aware certification."
+  },
+  {
+   "type": "h1",
+   "text": "Author Contributions"
+  },
+  {
+   "type": "p",
+   "text": "Conceptualisation, methodology, software, validation, formal analysis, investigation, data curation, writing (original draft and review and editing) and visualisation: I.E. The author has read and agreed to the published version of the manuscript."
+  },
+  {
+   "type": "h1",
+   "text": "Funding"
+  },
+  {
+   "type": "p",
+   "text": "This research received no external funding."
+  },
+  {
+   "type": "h1",
+   "text": "Institutional Review Board Statement"
+  },
+  {
+   "type": "p",
+   "text": "Not applicable. The study used public, licensed industrial and testbed datasets that contain no personal data."
+  },
+  {
+   "type": "h1",
+   "text": "Informed Consent Statement"
+  },
+  {
+   "type": "p",
+   "text": "Not applicable."
+  },
+  {
+   "type": "h1",
+   "text": "Data Availability Statement"
+  },
+  {
+   "type": "p",
+   "text": "All committed data are public and openly licensed: AI4I 2020 (doi:10.24432/C5HS5C), SECOM (doi:10.24432/C54305), Steel Plates Faults (doi:10.24432/C5J88N), Combined Cycle Power Plant (doi:10.24432/C5002N), Gas Turbine CO and NOx Emissions (doi:10.24432/C5WC95) and RT-IoT2022 (doi:10.24432/C5P338) under CC BY 4.0; the Bosch CNC feature table derived from github.com/boschresearch/CNC_Machining at commit d60581d (CC BY 4.0); and the HAI 21.03 window table derived from github.com/icsdataset/hai at commit 2a814ce (CC BY-SA 4.0). Derived tables, acquisition scripts, checksums, per-run outputs and the analysis workbook are available at github.com/Imomazin/research-projects in the folder Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six."
+  },
+  {
+   "type": "h1",
+   "text": "Code Availability"
+  },
+  {
+   "type": "p",
+   "text": "The NumPy DP-FedAvg implementation, secure aggregation, private aggregate risk control, tests, frozen protocol, configuration and analysis scripts are in the same folder, subfolder Experiments/Private Risk Control. A GitHub Actions workflow runs the test suite and a two-round smoke run on every change."
+  },
+  {
+   "type": "h1",
+   "text": "Use of Generative AI"
+  },
+  {
+   "type": "p",
+   "text": "The author used Claude (Anthropic) to assist with literature searching, software implementation, execution of the computational experiments, statistical analysis, figure preparation and drafting of the manuscript text. All study decisions, the frozen protocol, the verification of every reference against a bibliographic source and the final text were reviewed by the author, who takes full responsibility for the content. No generative AI system is listed as an author."
+  },
+  {
+   "type": "h1",
+   "text": "Acknowledgments"
+  },
+  {
+   "type": "p",
+   "text": "The author thanks the creators of the AI4I, SECOM, Steel Plates Faults, Combined Cycle Power Plant, Gas Turbine Emissions, RT-IoT2022, Bosch CNC Machining and HAI datasets for making their data public."
+  },
+  {
+   "type": "h1",
+   "text": "Conflicts of Interest"
+  },
+  {
+   "type": "p",
+   "text": "The author declares no conflicts of interest."
+  },
+  {
+   "type": "h1",
+   "text": "Appendix A. Proofs"
+  },
+  {
+   "type": "p",
+   "text": "**Proof of Proposition 1.** Fix the grid and let R~j~ = R(b~j~), which is non-decreasing in j. If R~j~ ≤ α~miss~ for every j there is nothing to prove. Otherwise let j∗ be the smallest index with R~j∗~ > α~miss~; j∗ depends only on the population and the grid. The scan admits a bin beyond j∗ − 1 only if it rejects at j∗, that is, only if p~j∗~ ≤ δ~test~. Condition on the calibration labels, so that the number of positives n~1~ is fixed and their scores are independent draws from the class-conditional law. The exact count of positives below b~j∗~ is M ∼ Bin(n~1~, R~j∗~) and the released statistic is m̃ = M + Z with Z ∼ Skellam(j∗μ, j∗μ) independent of M, because the noisy cumulative count is a sum of j∗ independent per-bin Skellam terms. Define the function"
+  },
+  {
+   "type": "eq",
+   "text": "F~n~(m) = P( Bin(n, α~miss~) + Z ≤ m )."
+  },
+  {
+   "type": "p",
+   "text": "Since Bin(n~1~, R~j∗~) is stochastically larger than Bin(n~1~, α~miss~), P(F~n1~(m̃) ≤ u) ≤ u for every u, so F~n1~(m̃) is a valid p-value. The server uses n⁻ = Ñ~1~ − q in place of n~1~, where q is the 1 − δ~count~ quantile of Skellam(Bμ, Bμ) and Ñ~1~ = n~1~ + Z' with Z' ∼ Skellam(Bμ, Bμ). On the event E = {n⁻ ≤ n~1~}, which has probability at least 1 − δ~count~, F~n⁻~(m) ≥ F~n1~(m) for every m because Bin(n⁻, α) is stochastically smaller than Bin(n~1~, α). Therefore"
+  },
+  {
+   "type": "eq",
+   "text": "P( p~j∗~ ≤ δ~test~ ) ≤ P( F~n1~(m̃) ≤ δ~test~ ) + P(E^c^) ≤ δ~test~ + δ~count~."
+  },
+  {
+   "type": "p",
+   "text": "The argument does not require Z and Z' to be independent. The same steps apply to the false-alarm scan, which admits bins from the top of the negative histogram and a union bound over the two scans gives joint validity with probability at least 1 − 2(δ~test~ + δ~count~). The guarantee concerns the population risk conditional on the calibration sample and therefore holds for future records exchangeable with the calibration records; it says nothing about records from a shifted distribution. The selective-classification and interval scans are the same argument with risk events \"wrong and accepted\" and \"absolute residual at or above the half-width\", whose counts are binomial in the total number of calibration records. ∎"
+  },
+  {
+   "type": "p",
+   "text": "**Proof of Proposition 2.** Let D be a dataset and D' = D ∪ {x}. Roles are assigned by independent coin flips, so the roles of all records other than x have the same distribution under D and D' and x is a training record with probability π and a calibration record otherwise. Write M = (M~T~(D~T~), M~C~(D~C~, M~T~(D~T~))) for the release. Conditional on x being a training record, M~C~ depends on x only through the released model, so by post-processing P(M(D') ∈ S) ≤ exp(ε~T~) P(M(D) ∈ S) + δ. Conditional on x being a calibration record, M~T~ has the same output distribution under D and D' and for every fixed model M~C~ is (ε~C~, δ) differentially private in its calibration input, so P(M(D') ∈ S) ≤ exp(ε~C~) P(M(D) ∈ S) + δ. Averaging over the role of x gives P(M(D') ∈ S) ≤ exp(max(ε~T~, ε~C~)) P(M(D) ∈ S) + δ and the reverse inequality follows identically. The per-client DP-SGD guarantee applies to each record of that client because each record belongs to exactly one client and the aggregate model is a post-processing of the client outputs. The Skellam histogram release changes exactly one coordinate by one under add-or-remove adjacency, so its privacy profile equals that of the scalar shift, which we evaluate exactly by summing the hockey-stick divergence over the integer support. ∎"
+  },
+  {
+   "type": "p",
+   "text": "**Proof of Proposition 3.** The scan admits the first bin only if F~n⁻~(m̃~1~) ≤ δ~test~ and F is non-decreasing in m. Without noise the most favourable observation is zero misses, F~n~(0) = (1 − α)^n^, so certification requires n ≥ ln δ~test~ / ln(1 − α), which is 30.6 for δ~test~ = 0.04 and α = 0.10. With noise a negative noise draw can occasionally admit the first bin with fewer events, so we report the smallest n at which a noisy count of zero is admitted at the lower count bound. This is the floor in the typical case and it is evaluated exactly. ∎"
+  },
+  {
+   "type": "h1",
+   "text": "Appendix B. Algorithms"
+  },
+  {
+   "type": "code",
+   "lines": [
+    "Algorithm 1  DP-FedAvg client update (client k, round r)",
+    "  input: global parameters w, local records (x_i, y_i), i = 1..n_k; batch B; rate q = B / n_k",
+    "  for each local step:",
+    "      draw S by including each record independently with probability q",
+    "      for i in S: g_i = gradient of loss at (x_i, y_i); c_i = min(1, C / ||g_i||)",
+    "      g = (sum_i c_i g_i + N(0, sigma_k^2 C^2 I)) / (q n_k);  v = beta v + g;  w = w - eta v",
+    "  return w   (sigma_k chosen so the RDP accountant reports epsilon_T after all steps)",
+    "",
+    "Algorithm 2  Private aggregate risk control (binary detection)",
+    "  input: shared model s(.), fixed edges b_0 < ... < b_B, targets alpha_miss, alpha_fa,",
+    "         delta_test, delta_count, total Skellam parameter mu (exact profile gives epsilon_C)",
+    "  each client k: h_k^+ = histogram of s(x) over calibration positives; h_k^- over negatives",
+    "                 add Skellam(mu/K, mu/K) to every bin; mask with pairwise ChaCha20 masks",
+    "  server: H^+ = secure sum of h_k^+;  H^- = secure sum of h_k^-",
+    "          n1 = sum(H^+) - q(1 - delta_count; Skellam(B mu, B mu)); n0 likewise",
+    "          j_low = 0; for j = 1..B: m = sum_{i<=j} H^+_i",
+    "              if P(Bin(n1, alpha_miss) + Skellam(j mu, j mu) <= m) <= delta_test: j_low = j",
+    "              else break",
+    "          j_high = 0; for j = 1..B: m = sum of the top j bins of H^-",
+    "              if P(Bin(n0, alpha_fa) + Skellam(j mu, j mu) <= m) <= delta_test: j_high = j",
+    "              else break",
+    "          t_low = b_{j_low} (or -inf); t_high = b_{B - j_high} (or +inf)",
+    "  deploy: s < t_low -> automatic pass; s >= t_high -> automatic alarm; otherwise escalate"
+   ]
+  },
+  {
+   "type": "p",
+   "text": "Complexity. Each client spends one forward pass per calibration record and O(B) work to histogram and mask; communication is 2B 32-bit integers per client plus 32-byte public keys. The server evaluates at most 2B convolutions of length n + 1, each costing O(n). For the largest task (RT-IoT2022) this took well under a second per policy on one core."
+  },
+  {
+   "type": "h1",
+   "text": "Appendix C. Extended Results"
+  },
+  {
+   "type": "p",
+   "text": "The analysis workbook holds every run, every metric and every summary used in the text. Table 12 gives intervals for the main utility comparisons."
+  },
+  {
+   "type": "table",
+   "caption": "**Table 12.** Utility with 95% bootstrap intervals over seeds.",
+   "header": [
+    "Task",
+    "Model",
+    "Mean",
+    "95% interval"
+   ],
+   "widths": [
+    2.5,
+    1.2,
+    1,
+    1.6
+   ],
+   "rows": [
+    [
+     "AI4I (PR-AUC)",
+     "FedAvg",
+     "0.581",
+     "0.510 to 0.645"
+    ],
+    [
+     "AI4I (PR-AUC)",
+     "DP-FedAvg, ε = 4",
+     "0.264",
+     "0.179 to 0.352"
+    ],
+    [
+     "AI4I (PR-AUC)",
+     "DP-FedAvg, ε = 1",
+     "0.096",
+     "0.059 to 0.139"
+    ],
+    [
+     "SECOM (PR-AUC)",
+     "FedAvg",
+     "0.102",
+     "0.085 to 0.118"
+    ],
+    [
+     "SECOM (PR-AUC)",
+     "DP-FedAvg, ε = 4",
+     "0.069",
+     "0.061 to 0.077"
+    ],
+    [
+     "SECOM (PR-AUC)",
+     "DP-FedAvg, ε = 1",
+     "0.064",
+     "0.057 to 0.072"
+    ],
+    [
+     "Steel (macro F1)",
+     "FedAvg",
+     "0.733",
+     "0.716 to 0.752"
+    ],
+    [
+     "Steel (macro F1)",
+     "DP-FedAvg, ε = 4",
+     "0.503",
+     "0.475 to 0.529"
+    ],
+    [
+     "Steel (macro F1)",
+     "DP-FedAvg, ε = 1",
+     "0.286",
+     "0.245 to 0.321"
+    ],
+    [
+     "Power (RMSE, MW)",
+     "FedAvg",
+     "4.279",
+     "4.155 to 4.408"
+    ],
+    [
+     "Power (RMSE, MW)",
+     "DP-FedAvg, ε = 4",
+     "4.345",
+     "4.204 to 4.491"
+    ],
+    [
+     "Power (RMSE, MW)",
+     "DP-FedAvg, ε = 1",
+     "5.264",
+     "5.043 to 5.498"
+    ],
+    [
+     "Gas NOx (RMSE, mg/m^3^)",
+     "FedAvg",
+     "4.909",
+     "4.681 to 5.229"
+    ],
+    [
+     "Gas NOx (RMSE, mg/m^3^)",
+     "DP-FedAvg, ε = 4",
+     "5.292",
+     "5.156 to 5.435"
+    ],
+    [
+     "Gas NOx (RMSE, mg/m^3^)",
+     "DP-FedAvg, ε = 1",
+     "5.969",
+     "5.777 to 6.190"
+    ],
+    [
+     "RT-IoT (PR-AUC)",
+     "FedAvg",
+     "1.000",
+     "1.000 to 1.000"
+    ],
+    [
+     "RT-IoT (PR-AUC)",
+     "DP-FedAvg, ε = 4",
+     "0.998",
+     "0.997 to 0.999"
+    ],
+    [
+     "RT-IoT (PR-AUC)",
+     "DP-FedAvg, ε = 1",
+     "0.997",
+     "0.996 to 0.998"
+    ],
+    [
+     "Bosch machines (PR-AUC)",
+     "FedAvg",
+     "0.785",
+     "0.725 to 0.841"
+    ],
+    [
+     "Bosch machines (PR-AUC)",
+     "DP-FedAvg, ε = 4",
+     "0.292",
+     "0.200 to 0.406"
+    ],
+    [
+     "Bosch machines (PR-AUC)",
+     "DP-FedAvg, ε = 1",
+     "0.076",
+     "0.051 to 0.106"
+    ],
+    [
+     "Bosch early periods (PR-AUC)",
+     "FedAvg",
+     "0.904",
+     "0.871 to 0.939"
+    ],
+    [
+     "Bosch early periods (PR-AUC)",
+     "DP-FedAvg, ε = 4",
+     "0.349",
+     "0.237 to 0.461"
+    ],
+    [
+     "Bosch early periods (PR-AUC)",
+     "DP-FedAvg, ε = 1",
+     "0.057",
+     "0.044 to 0.070"
+    ],
+    [
+     "Bosch two machines (PR-AUC)",
+     "FedAvg",
+     "0.801",
+     "0.712 to 0.882"
+    ],
+    [
+     "Bosch two machines (PR-AUC)",
+     "DP-FedAvg, ε = 4",
+     "0.378",
+     "0.250 to 0.522"
+    ],
+    [
+     "Bosch two machines (PR-AUC)",
+     "DP-FedAvg, ε = 1",
+     "0.065",
+     "0.042 to 0.098"
+    ],
+    [
+     "HAI sessions (PR-AUC)",
+     "FedAvg",
+     "0.543",
+     "0.479 to 0.608"
+    ],
+    [
+     "HAI sessions (PR-AUC)",
+     "DP-FedAvg, ε = 4",
+     "0.269",
+     "0.178 to 0.364"
+    ],
+    [
+     "HAI sessions (PR-AUC)",
+     "DP-FedAvg, ε = 1",
+     "0.036",
+     "0.027 to 0.047"
+    ]
+   ]
+  },
+  {
+   "type": "h1",
+   "text": "Appendix D. Selected Hyperparameters"
+  },
+  {
+   "type": "p",
+   "text": "Learning rates were chosen from {0.01, 0.03, 0.1, 0.3} (DP: {0.03, 0.1, 0.3, 1.0} with batch {64, 256} or {256, 1024} for RT-IoT, momentum {0.5, 0.9} and class weight {1, public}) on tuning seed 0 using validation PR-AUC, macro F1 or RMSE (Table 13)."
+  },
+  {
+   "type": "table",
+   "caption": "**Table 13.** Selected hyperparameters.",
+   "header": [
+    "Task",
+    "FedAvg lr",
+    "FedProx",
+    "SCAFFOLD lr",
+    "Pooled lr",
+    "DP-FedAvg"
+   ],
+   "widths": [
+    1.3,
+    0.9,
+    1.3,
+    1,
+    0.9,
+    3
+   ],
+   "rows": [
+    [
+     "Bosch CNC",
+     "0.1",
+     "0.01 (μ 0.1)",
+     "0.3",
+     "0.03",
+     "lr 0.1, batch 64, momentum 0.9, class weight 20"
+    ],
+    [
+     "Gas turbine",
+     "0.03",
+     "0.01 (μ 0.01)",
+     "0.03",
+     "0.03",
+     "lr 0.3, batch 256, momentum 0.5, class weight 1"
+    ],
+    [
+     "HAI",
+     "0.01",
+     "0.01 (μ 0.1)",
+     "0.3",
+     "0.01",
+     "lr 0.03, batch 64, momentum 0.9, class weight 30"
+    ],
+    [
+     "AI4I",
+     "0.1",
+     "0.01 (μ 0.01)",
+     "0.01",
+     "0.03",
+     "lr 1.0, batch 256, momentum 0.5, class weight 25"
+    ],
+    [
+     "Power plant",
+     "0.03",
+     "0.01 (μ 0.01)",
+     "0.1",
+     "0.03",
+     "lr 0.3, batch 256, momentum 0.5, class weight 1"
+    ],
+    [
+     "SECOM",
+     "0.3",
+     "0.01 (μ 0.01)",
+     "0.03",
+     "0.03",
+     "lr 1.0, batch 256, momentum 0.9, class weight 14"
+    ],
+    [
+     "Steel plates",
+     "0.1",
+     "0.01 (μ 0.01)",
+     "0.1",
+     "0.01",
+     "lr 1.0, batch 256, momentum 0.9, class weight 1"
+    ],
+    [
+     "RT-IoT2022",
+     "0.1",
+     "0.01 (μ 0.01)",
+     "0.1",
+     "0.01",
+     "lr 0.1, batch 1024, momentum 0.9, class weight 1"
+    ]
+   ]
+  },
+  {
+   "type": "h1",
+   "text": "Appendix E. Dataset Provenance"
+  },
+  {
+   "type": "p",
+   "text": "Datasets/Source Register.csv in the repository records for every source the identifier, organisation, citation and DOI, acquisition date, version or commit, licence, redistribution terms, observed or synthetic status, counts, missing share, class distribution, natural clients, temporal information, supported designs, limitations, SHA-256 checksums and validation outcome. Six further candidates are listed with the reason they were not acquired."
+  },
+  {
+   "type": "h1",
+   "text": "Appendix F. Reproducibility"
+  },
+  {
+   "type": "p",
+   "text": "To reproduce: clone the repository, install Experiments/Private Risk Control/Requirements.txt, run Data Collection/Acquire External Industrial Sources.py with a target outside the repository if the Bosch and HAI tables are to be rebuilt, then run, from Experiments/Private Risk Control, the commands \"python Run Confirmatory Study.py main --datasets <task> --seeds 1 2 3 4 5 6 7 8 9 10\", the sensitivity and reconstruction stages, \"python Validate Risk Guarantee.py\", \"python Compute Evidence Floor.py\", \"python Analyse Results.py\", \"python Make Figures.py\" and \"python Build Workbook.py\". Tests run with \"python Test Private Risk Control.py -v\" and cover data integrity, leakage of targets and groups, role disjointness, train-only scaling, gradient correctness, per-example clipping, noise scale, privacy calibration against the accountant and the exact Skellam profile, secure-aggregation correctness and failure under dropout, risk-control p-value validity and a Monte Carlo check of the guarantee."
+  },
+  {
+   "type": "h1",
+   "text": "References"
+  },
+  {
+   "type": "refs",
+   "items": [
+    "McMahan, B.; Moore, E.; Ramage, D.; Hampson, S.; Agüera y Arcas, B. Communication-Efficient Learning of Deep Networks from Decentralized Data. In *Proceedings of the 20th International Conference on Artificial Intelligence and Statistics*; PMLR 54: 2017; pp. 1273–1282.",
+    "Kairouz, P.; McMahan, H.B.; Avent, B.; et al. Advances and Open Problems in Federated Learning. *Found. Trends Mach. Learn.* **2021**, *14*, 1–210. https://doi.org/10.1561/2200000083.",
+    "Abadi, M.; Chu, A.; Goodfellow, I.; McMahan, H.B.; Mironov, I.; Talwar, K.; Zhang, L. Deep Learning with Differential Privacy. In *Proceedings of the 2016 ACM SIGSAC Conference on Computer and Communications Security*; ACM: 2016. https://doi.org/10.1145/2976749.2978318.",
+    "Dwork, C.; Roth, A. The Algorithmic Foundations of Differential Privacy. *Found. Trends Theor. Comput. Sci.* **2014**, *9*, 211–407. https://doi.org/10.1561/0400000042.",
+    "Ferrag, M.A.; Friha, O.; Hamouda, D.; Maglaras, L.; Janicke, H. Edge-IIoTset: A New Comprehensive Realistic Cyber Security Dataset of IoT and IIoT Applications for Centralized and Federated Learning. *IEEE Access* **2022**, *10*, 40281–40306. https://doi.org/10.1109/ACCESS.2022.3165809.",
+    "Ma, S.; Nie, J.; Kang, J.; Lyu, L.; Liu, R.W.; Zhao, R.; Liu, Z.; Niyato, D. Privacy-Preserving Anomaly Detection in Cloud Manufacturing via Federated Transformer. *arXiv* **2022**, arXiv:2204.00843.",
+    "Kamali Poorazad, S.; Benzaïd, C.; Taleb, T. Toward Securing IIoT: An Innovative Privacy-Preserving Anomaly Detector Based on Federated Learning. *IEEE Internet Things J.* **2025**, *12*, 52123–52142. https://doi.org/10.1109/JIOT.2025.3613063.",
+    "Padmavathi, V.; Saminathan, R. A Federated Edge Intelligence Framework with Trust Based Access Control for Secure and Privacy Preserving IoT Systems. *Sci. Rep.* **2025**, *15*, 35832. https://doi.org/10.1038/s41598-025-19712-1.",
+    "Bagdasaryan, E.; Poursaeed, O.; Shmatikov, V. Differential Privacy Has Disparate Impact on Model Accuracy. In *Advances in Neural Information Processing Systems 32*; 2019.",
+    "Vovk, V.; Gammerman, A.; Shafer, G. *Algorithmic Learning in a Random World*, 2nd ed.; Springer: Cham, Switzerland, 2022. https://doi.org/10.1007/978-3-031-06649-8.",
+    "Angelopoulos, A.N.; Bates, S. Conformal Prediction: A Gentle Introduction. *Found. Trends Mach. Learn.* **2023**, *16*, 494–591. https://doi.org/10.1561/2200000101.",
+    "Bates, S.; Angelopoulos, A.; Lei, L.; Malik, J.; Jordan, M.I. Distribution-Free, Risk-Controlling Prediction Sets. *arXiv* **2021**, arXiv:2101.02703.",
+    "Angelopoulos, A.N.; Bates, S.; Candès, E.J.; Jordan, M.I.; Lei, L. Learn then Test: Calibrating Predictive Algorithms to Achieve Risk Control. *arXiv* **2021**, arXiv:2110.01052.",
+    "Lu, C.; Yu, Y.; Karimireddy, S.P.; Jordan, M.; Raskar, R. Federated Conformal Predictors for Distributed Uncertainty Quantification. In *Proceedings of the 40th International Conference on Machine Learning*; PMLR 202: 2023; pp. 22942–22964.",
+    "Humbert, P.; Le Bars, B.; Bellet, A.; Arlot, S. One-Shot Federated Conformal Prediction. In *Proceedings of the 40th International Conference on Machine Learning*; PMLR 202: 2023; pp. 14153–14177.",
+    "Plassier, V.; Makni, M.; Rubashevskii, A.; Moulines, E.; Panov, M. Conformal Prediction for Federated Uncertainty Quantification Under Label Shift. In *Proceedings of the 40th International Conference on Machine Learning*; PMLR 202: 2023; pp. 27907–27947.",
+    "Angelopoulos, A.N.; Bates, S.; Zrnic, T.; Jordan, M.I. Private Prediction Sets. *Harv. Data Sci. Rev.* **2022**. https://doi.org/10.1162/99608f92.16c71dad.",
+    "Romanus, O.M.; Molinari, R. Differentially Private Conformal Prediction via Quantile Binary Search. *Trans. Mach. Learn. Res.* **2026**. arXiv:2507.12497.",
+    "Wu, J.; Zhang, C.; Cai, Z.; Kong, J.; Jiang, B.; Kong, L.; Kong, L. Differentially Private Conformal Prediction. *arXiv* **2026**, arXiv:2604.14621.",
+    "Penso, C.; Mahpud, B.; Goldberger, J.; Sheffet, O. Privacy-Preserving Conformal Prediction Under Local Differential Privacy. In *Proceedings of the Fourteenth Symposium on Conformal and Probabilistic Prediction with Applications*; PMLR 266: 2025; pp. 96–112.",
+    "Maddock, S.; Cormode, G.; Maple, C. Private Federated Multiclass Post-hoc Calibration. *arXiv* **2025**, arXiv:2510.01987.",
+    "Talpini, J.; Civiero, N.; Sartori, F.; Savi, M. A Federated Approach to Enhance Calibration of Distributed ML-Based Intrusion Detection Systems. In *Proceedings of the 17th International Conference on Agents and Artificial Intelligence*; SciTePress: 2025; Volume 2, pp. 840–848. https://doi.org/10.5220/0013376600003890.",
+    "Duggal, A.S.; Malik, P.K.; Gehlot, A.; Singh, R.; Gaba, G.S.; Masud, M.; Al-Amri, J.F. A Sequential Roadmap to Industry 6.0: Exploring Future Manufacturing Trends. *IET Commun.* **2022**, *16*, 521–531.",
+    "Fernández-Miguel, A.; Ortíz-Marcos, S.; Jiménez-Calzado, M.; Fernández del Hoyo, A.P.; García-Muiña, F.E.; Settembre-Blundo, D. Toward the Theoretical Foundations of Industry 6.0: A Framework for AI-Driven Decentralized Manufacturing Control. *Future Internet* **2025**, *17*, 455. https://doi.org/10.3390/fi17100455.",
+    "Lykov, A.; Altamirano Cabrera, M.; Konenkov, M.; Serpiva, V.; Gbagbe, K.F.; Alabbas, A.; Fedoseev, A.; Moreno, L.; Khan, M.H.; Guo, Z.; Tsetserukou, D. Industry 6.0: New Generation of Industry Driven by Generative AI and Swarm of Heterogeneous Robots. In *Proceedings of the 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)*; IEEE: 2025. https://doi.org/10.1109/IROS60139.2025.11247291.",
+    "Babkin, A.V.; Liberman, I.V.; Klachek, P.M.; Shkarupeta, E.V. Industry 6.0: Methodology, Tools, Practice. *π-Economy* **2025**, *18*, 21–56. https://doi.org/10.18721/JE.18102.",
+    "Breque, M.; De Nul, L.; Petridis, A. *Industry 5.0: Towards a Sustainable, Human-Centric and Resilient European Industry*; European Commission, Directorate-General for Research and Innovation: Brussels, Belgium, 2021.",
+    "Xu, X.; Lu, Y.; Vogel-Heuser, B.; Wang, L. Industry 4.0 and Industry 5.0—Inception, Conception and Perception. *J. Manuf. Syst.* **2021**, *61*, 530–535. https://doi.org/10.1016/j.jmsy.2021.10.006.",
+    "Ivanov, D. The Industry 5.0 Framework: Viability-Based Integration of the Resilience, Sustainability, and Human-Centricity Perspectives. *Int. J. Prod. Res.* **2023**, *61*, 1683–1695. https://doi.org/10.1080/00207543.2022.2118892.",
+    "Leng, J.; Sha, W.; Wang, B.; Zheng, P.; Zhuang, C.; Liu, Q.; Wuest, T.; Mourtzis, D.; Wang, L. Industry 5.0: Prospect and Retrospect. *J. Manuf. Syst.* **2022**, *65*, 279–295. https://doi.org/10.1016/j.jmsy.2022.09.017.",
+    "Annanperä, E.; Jurmu, M.; Kaivo-oja, J.; Kettunen, P.; Knudsen, M.; Lauraéus, T.; Majava, J.; Porras, J. *From Industry X to Industry 6.0: Antifragile Manufacturing for People, Planet, and Profit with Passion*; Business Finland AIF White Paper 5/2021; Business Finland: Helsinki, Finland, 2021.",
+    "Li, T.; Sahu, A.K.; Zaheer, M.; Sanjabi, M.; Talwalkar, A.; Smith, V. Federated Optimization in Heterogeneous Networks. In *Proceedings of Machine Learning and Systems*; 2020; Volume 2, pp. 429–450.",
+    "Karimireddy, S.P.; Kale, S.; Mohri, M.; Reddi, S.; Stich, S.; Suresh, A.T. SCAFFOLD: Stochastic Controlled Averaging for Federated Learning. In *Proceedings of the 37th International Conference on Machine Learning*; PMLR 119: 2020; pp. 5132–5143.",
+    "Yin, D.; Chen, Y.; Ramchandran, K.; Bartlett, P. Byzantine-Robust Distributed Learning: Towards Optimal Statistical Rates. In *Proceedings of the 35th International Conference on Machine Learning*; PMLR 80: 2018; pp. 5650–5659.",
+    "Blanchard, P.; El Mhamdi, E.M.; Guerraoui, R.; Stainer, J. Machine Learning with Adversaries: Byzantine Tolerant Gradient Descent. In *Advances in Neural Information Processing Systems 30*; 2017; pp. 119–129.",
+    "Fang, M.; Cao, X.; Jia, J.; Gong, N. Local Model Poisoning Attacks to Byzantine-Robust Federated Learning. In *Proceedings of the 29th USENIX Security Symposium*; USENIX Association: 2020; pp. 1605–1622.",
+    "Bagdasaryan, E.; Veit, A.; Hua, Y.; Estrin, D.; Shmatikov, V. How To Backdoor Federated Learning. In *Proceedings of the 23rd International Conference on Artificial Intelligence and Statistics*; PMLR 108: 2020; pp. 2938–2948.",
+    "Shokri, R.; Stronati, M.; Song, C.; Shmatikov, V. Membership Inference Attacks against Machine Learning Models. *arXiv* **2016**, arXiv:1610.05820.",
+    "Yeom, S.; Giacomelli, I.; Fredrikson, M.; Jha, S. Privacy Risk in Machine Learning: Analyzing the Connection to Overfitting. *arXiv* **2017**, arXiv:1709.01604.",
+    "Carlini, N.; Chien, S.; Nasr, M.; Song, S.; Terzis, A.; Tramèr, F. Membership Inference Attacks From First Principles. *arXiv* **2021**, arXiv:2112.03570.",
+    "Zhu, L.; Liu, Z.; Han, S. Deep Leakage from Gradients. In *Advances in Neural Information Processing Systems 32*; 2019; pp. 14774–14784.",
+    "Geiping, J.; Bauermeister, H.; Dröge, H.; Moeller, M. Inverting Gradients: How Easy Is It to Break Privacy in Federated Learning? In *Advances in Neural Information Processing Systems 33*; 2020. arXiv:2003.14053.",
+    "Mironov, I. Rényi Differential Privacy. In *Proceedings of the IEEE Computer Security Foundations Symposium (CSF)*; IEEE: 2017. https://doi.org/10.1109/CSF.2017.11.",
+    "Bonawitz, K.; Ivanov, V.; Kreuter, B.; Marcedone, A.; McMahan, H.B.; Patel, S.; Ramage, D.; Segal, A.; Seth, K. Practical Secure Aggregation for Privacy-Preserving Machine Learning. In *Proceedings of the 2017 ACM SIGSAC Conference on Computer and Communications Security (CCS)*; ACM: 2017. Cryptology ePrint Archive 2017/281.",
+    "Kairouz, P.; Liu, Z.; Steinke, T. The Distributed Discrete Gaussian Mechanism for Federated Learning with Secure Aggregation. In *Proceedings of the 38th International Conference on Machine Learning*; PMLR 139: 2021; pp. 5201–5212.",
+    "Agarwal, N.; Kairouz, P.; Liu, Z. The Skellam Mechanism for Differentially Private Federated Learning. In *Advances in Neural Information Processing Systems 34*; 2021; pp. 5052–5064.",
+    "Guo, C.; Pleiss, G.; Sun, Y.; Weinberger, K.Q. On Calibration of Modern Neural Networks. In *Proceedings of the 34th International Conference on Machine Learning*; PMLR 70: 2017; pp. 1321–1330.",
+    "Geifman, Y.; El-Yaniv, R. Selective Classification for Deep Neural Networks. In *Advances in Neural Information Processing Systems 30*; 2017; pp. 4878–4887.",
+    "Lari, E.; Arablouei, R.; Werner, S. Communication-Efficient Byzantine-Robust Federated Conformal Prediction via Partial Sharing. *arXiv* **2026**, arXiv:2602.18396.",
+    "National Institute of Standards and Technology. *Artificial Intelligence Risk Management Framework (AI RMF 1.0)*; NIST AI 100-1; NIST: Gaithersburg, MD, USA, 2023. https://doi.org/10.6028/NIST.AI.100-1.",
+    "European Union. Regulation (EU) 2024/1689 of the European Parliament and of the Council Laying Down Harmonised Rules on Artificial Intelligence (Artificial Intelligence Act). *Off. J. Eur. Union* **2024**, L 2024/1689, 12 July 2024.",
+    "Matzka, S. Explainable Artificial Intelligence for Predictive Maintenance Applications. In *Proceedings of the Third International Conference on Artificial Intelligence for Industries (AI4I)*; IEEE: Irvine, CA, USA, 2020; pp. 69–74.",
+    "McCann, M.; Johnston, A. SECOM [Dataset]. UCI Machine Learning Repository, 2008. https://doi.org/10.24432/C54305.",
+    "Buscema, M.; Terzi, S.; Tastle, W. Steel Plates Faults [Dataset]. UCI Machine Learning Repository, 2010. https://doi.org/10.24432/C5J88N.",
+    "Tüfekci, P. Prediction of Full Load Electrical Power Output of a Base Load Operated Combined Cycle Power Plant Using Machine Learning Methods. *Int. J. Electr. Power Energy Syst.* **2014**, *60*. Dataset: https://doi.org/10.24432/C5002N.",
+    "Kaya, H.; Tüfekci, P.; Uzun, E. Predicting CO and NOx Emissions from Gas Turbines: Novel Data and a Benchmark PEMS. *Turk. J. Electr. Eng. Comput. Sci.* **2019**, *27*, 4783–4796. https://doi.org/10.3906/elk-1807-87.",
+    "Sharmila, B.S.; Nagapadma, R. Quantized Autoencoder (QAE) Intrusion Detection System for Anomaly Detection in Resource-Constrained IoT Devices Using RT-IoT2022 Dataset. *Cybersecurity* **2023**, *6*. https://doi.org/10.1186/s42400-023-00178-5.",
+    "Tnani, M.A.; Feil, M.; Diepold, K. Smart Data Collection System for Brownfield CNC Milling Machines: A New Benchmark Dataset for Data-Driven Machine Monitoring. *Procedia CIRP* **2022**, *107*, 131–136. https://doi.org/10.1016/j.procir.2022.04.022.",
+    "Shin, H.K.; Lee, W.; Yun, J.H.; Min, B.G. Two ICS Security Datasets and Anomaly Detection Contest on the HIL-Based Augmented ICS Testbed. In *Proceedings of the Cyber Security Experimentation and Test Workshop (CSET '21)*; ACM: 2021; pp. 36–40. https://doi.org/10.1145/3474718.3474719.",
+    "Papernot, N.; Steinke, T. Hyperparameter Tuning with Renyi Differential Privacy. In *Proceedings of the International Conference on Learning Representations (ICLR)*; 2022.",
+    "Clopper, C.J.; Pearson, E.S. The Use of Confidence or Fiducial Limits Illustrated in the Case of the Binomial. *Biometrika* **1934**, *26*, 404–413.",
+    "Enang, I.J.; Leevy, J.L.; Billion-Polak, P.; Khoshgoftaar, T.M. Resilience of Federated Learning for Credit Risk Forecasting Under Heterogeneity, Label Noise and Partial Participation. *IEEE Access* **2026**, accepted. https://doi.org/10.1109/ACCESS.2026.3743719.",
+    "Benjamini, Y.; Hochberg, Y. Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing. *J. R. Stat. Soc. Ser. B* **1995**, *57*, 289–300. https://doi.org/10.1111/j.2517-6161.1995.tb02031.x.",
+    "Holm, S. A Simple Sequentially Rejective Multiple Test Procedure. *Scand. J. Stat.* **1979**, *6*, 65–70."
+   ]
+  }
+ ]
+}

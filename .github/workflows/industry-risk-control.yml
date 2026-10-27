@@ -1,0 +1,43 @@
+name: Industry private risk control checks
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six/Experiments/Private Risk Control/*.py"
+      - "Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six/Experiments/Private Risk Control/*.json"
+      - ".github/workflows/industry-risk-control.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      BASE: Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six/Experiments/Private Risk Control
+      OMP_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: "Industry and Intelligent Systems/Industries/Privacy Trust and Intelligent Systems in Industry Six/Experiments/Private Risk Control/Requirements.txt"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r "$BASE/Requirements.txt"
+      - name: Data integrity, leakage, gradient, accounting, secure aggregation and risk-control tests
+        working-directory: ${{ env.BASE }}
+        run: python "Test Private Risk Control.py" -v
+      - name: Two-round smoke run on three tasks
+        working-directory: ${{ env.BASE }}
+        run: python "Run Confirmatory Study.py" main --datasets maintenance steel power --seeds 1 --epsilons 4 --smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Private Risk Control Smoke
+          path: "${{ env.BASE }}/Smoke Results/**"
+          if-no-files-found: warn

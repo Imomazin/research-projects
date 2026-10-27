@@ -391,9 +391,24 @@ def run_sensitivity(dataset, design, seed, variant):
         poison_levels = [0.25, 0.5, 1.0, 2.0]
     elif variant == "corruption":
         corruption = [("gaussian", 0.5), ("gaussian", 1.0), ("missing", 0.2), ("missing", 0.4)]
+    if variant == "calibration epsilon":
+        include = ["fedavg"]
     prep = L.prepare(task, seed, design, clients=clients, alpha=alpha)
     result = header(task, prep, seed, "sensitivity", design)
     result["variant"] = variant
+    if variant == "calibration epsilon":
+        models, logs, _ = train_models(task, prep, seed, hp, [], include=["fedavg", "reference"])
+        result["training_logs"] = logs
+        result["metrics"] = evaluate(task, prep, models)
+        result["calibration_sweep"] = {}
+        for e in CONFIG["calibration_sweep_epsilons"]:
+            mu_e = L.calibrate_skellam_mu(float(e), CONFIG["training"]["delta"])
+            result["calibration_sweep"][f"{e:g}"] = policy_block(
+                task, prep, models["fedavg"], mu_e,
+                ["nonprivate_ltt", "plugin", "ucb_without_noise", "proposed"], seed, f"sweep-{e}")
+            result["calibration_sweep"][f"{e:g}"]["mu"] = mu_e
+        write(result, RESULTS / "Sensitivity" / f"{dataset.title()} {variant.title()}", f"Seed {seed}.json")
+        return result
     models, logs, _ = train_models(task, prep, seed, hp, [eps], include=include + ["reference"],
                                    overrides=overrides)
     result["training_logs"] = logs
@@ -533,7 +548,13 @@ def main():
     cli.add_argument("--design", default=None)
     cli.add_argument("--variants", nargs="+", default=[])
     cli.add_argument("--epsilons", nargs="+", type=float, default=None)
+    cli.add_argument("--smoke", action="store_true",
+                     help="Two training rounds, outputs to Smoke Results; a software check, not a result")
     args = cli.parse_args()
+    if args.smoke:
+        global RESULTS
+        CONFIG["training"]["rounds"] = 2
+        RESULTS = HERE / "Smoke Results"
     eps_list = args.epsilons or CONFIG["epsilons"]
     failures = []
     for ds in args.datasets:

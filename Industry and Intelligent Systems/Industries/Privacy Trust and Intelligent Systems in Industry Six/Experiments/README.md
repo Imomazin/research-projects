@@ -56,3 +56,7 @@ Every model family must be assessed on the same prespecified task. Different eps
 ## Existing pilot evidence
 
 See Pilot Evidence.md for six GitHub Actions smoke-test results, including unsuccessful method outcomes and class-imbalance failures. Test statistics should not be quoted as representative industrial field performance.
+
+## Confirmatory study
+
+The pilot pipeline above is retained as recorded. The confirmatory study uses Experiments/Private Risk Control, which implements DP-SGD in NumPy (Opacus could not be installed in the execution environment) with Google dp_accounting, secure aggregation and private aggregate risk control. Its pilot artefacts could not be re-verified because GitHub Actions artefacts were not accessible from the execution environment, so the pilot numbers in Pilot Evidence.md and Paired Pilot Findings.md are not used as results.
