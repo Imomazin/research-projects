@@ -46,6 +46,7 @@ def load(path):
     X = raw[feat].to_numpy(dtype=np.float64)
     y = raw["default payment next month"].to_numpy(dtype=np.int8)
     assert len(y)==30000 and X.shape[1]==23 and set(np.unique(y))=={0,1}, "Unexpected Taiwan dataset shape or labels"
+    assert int(y.sum()) == 6636, "Unexpected Taiwan dataset outcome prevalence"
     return X, y, feat.index("LIMIT_BAL")
 
 def base_split(X, y, limit_idx, seed):
@@ -101,7 +102,7 @@ def adv_and_tpr(mem, non):
     tpr_at = float(np.interp(0.01, fpr, tpr))
     return adv, tpr_at
 
-def boot_ci(mem, non, B=2000, seed=0):
+def boot_ci(mem, non, B=400, seed=0):
     rng = np.random.RandomState(seed); advs = []
     for _ in range(B):
         a, b = rng.randint(0, len(mem), len(mem)), rng.randint(0, len(non), len(non))
@@ -134,7 +135,17 @@ def matched(X, y, li, seeds, out):
                 pos = np.flatnonzero(labels==1); neg = np.flatnonzero(labels==0)
                 npos = int(round(n*rate)); nneg = n-npos
                 return np.r_[r.choice(pos, min(npos,len(pos)), replace=False), r.choice(neg, min(nneg,len(neg)), replace=False)]
-            mo = by_class(sm, memY, len(no) if False else 3000); no = np.concatenate([r.choice(np.intersect1d(ref_ev, np.flatnonzero(yte==cls)), min(int(round(3000*(rate if cls else 1-rate))), len(np.intersect1d(ref_ev,np.flatnonzero(yte==cls)))), replace=False) for cls in (0,1)])
+            # Match class counts exactly across member and nonmember groups.
+            mo_parts, no_parts = [], []
+            for cls in (0, 1):
+                member_pool = np.flatnonzero(memY == cls)
+                non_pool = np.intersect1d(ref_ev, np.flatnonzero(yte == cls))
+                desired = int(round(3000 * (rate if cls else 1-rate)))
+                k = min(desired, len(member_pool), len(non_pool))
+                if k:
+                    mo_parts.append(r.choice(member_pool, k, replace=False))
+                    no_parts.append(r.choice(non_pool, k, replace=False))
+            mo, no = np.concatenate(mo_parts), np.concatenate(no_parts)
             adv_o, tpr_o = adv_and_tpr(sm[mo], sn[no]); lo_o, hi_o = boot_ci(sm[mo], sn[no], seed=int(s)+7)
             # segment-matched: equal (segment x outcome) counts
             mm_idx, nn_idx = [], []
@@ -219,10 +230,11 @@ def main():
     ap.add_argument("--mode", required=True, choices=["matched", "control", "calibration"])
     ap.add_argument("--data", required=True, help="path to default of credit card clients.xlsx")
     ap.add_argument("--seeds", type=int, default=30)
+    ap.add_argument("--seed-start", type=int, default=17286)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     X, y, li = load(a.data)
-    seeds = list(range(17286, 17286+a.seeds))
+    seeds = list(range(a.seed_start, a.seed_start+a.seeds))
     {"matched": matched, "control": control, "calibration": calib}[a.mode](X, y, li, seeds, a.out)
 
 if __name__ == "__main__":
