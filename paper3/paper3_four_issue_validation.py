@@ -50,8 +50,8 @@ def load(path):
 
 def partitions(X,y,limit,seed):
     ix=np.arange(len(y))
-    target,aux=train_test_split(ix,test_size=.30,random_state=seed,stratify=y)
-    public,test=train_test_split(aux,test_size=.5,random_state=seed+1,stratify=y[aux])
+    target,aux=train_test_split(ix,test_size=.30,random_state=seed)
+    public,test=train_test_split(aux,test_size=.5,random_state=seed+1)
     # Public calibration/reference and test records are excluded from the private training population.
     return target,public,test
 
