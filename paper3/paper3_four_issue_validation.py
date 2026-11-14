@@ -36,6 +36,7 @@ def load(path):
     cols=[c for c in df if c not in ('ID','default payment next month')]
     assert len(df)==30000 and len(cols)==23 and int(df['default payment next month'].sum())==6636
     X=df[cols].to_numpy(float);y=df['default payment next month'].to_numpy(int)
+    ids=df['ID'].to_numpy(int);assert len(np.unique(ids))==len(ids)
     # All transforms below are fixed publicly, not fitted from protected records.
     scales=[]
     for c in cols:
@@ -46,13 +47,17 @@ def load(path):
         else:scales.append(100000.)
     X=X/np.asarray(scales)
     limit=df['LIMIT_BAL'].to_numpy(float)
-    return X,y,limit
+    return X,y,limit,ids
 
-def partitions(X,y,limit,seed):
-    ix=np.arange(len(y))
-    target,aux=train_test_split(ix,test_size=.30,random_state=seed)
-    public,test=train_test_split(aux,test_size=.5,random_state=seed+1)
-    # Public calibration/reference and test records are excluded from the private training population.
+def partitions(X,y,limit,ids,seed):
+    # Public, fixed, per-ID allocation. Adding/removing a protected training
+    # record leaves every other record's allocation unchanged.
+    # IDs are treated as stable public keys; this is an explicit assumption.
+    v=np.array([int.from_bytes(hashlib.sha256(f'{seed}:{int(i)}'.encode()).digest()[:8],'big')/2**64 for i in ids])
+    target=np.flatnonzero(v<.70)
+    public=np.flatnonzero((v>=.70)&(v<.85))
+    test=np.flatnonzero(v>=.85)
+    assert min(len(target),len(public),len(test))>10
     return target,public,test
 
 def clients(X,y,limit,ix):
@@ -111,8 +116,8 @@ def metrics(y,p):
         if m.any():ece+=m.mean()*abs(y[m].mean()-p[m].mean())
     return roc_auc_score(y,p),brier_score_loss(y,p),ece
 
-def experiment(X,y,limit,seed):
-    target,public,test=partitions(X,y,limit,seed)
+def experiment(X,y,limit,ids,seed):
+    target,public,test=partitions(X,y,limit,ids,seed)
     cl=clients(X,y,limit,target)
     # paired random streams for controls; private stream has added Gaussian draws.
     models={k:train(cl,seed+101,k) for k in ('unclipped','clipped','normmatched','private')}
@@ -153,12 +158,12 @@ def experiment(X,y,limit,seed):
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--data',required=True);ap.add_argument('--out',required=True)
     ap.add_argument('--seed-start',type=int,default=17286);ap.add_argument('--seeds',type=int,default=10)
-    a=ap.parse_args();X,y,limit=load(a.data)
+    a=ap.parse_args();X,y,limit,ids=load(a.data)
     order,eps=rdp_eps()
     print(f'Conditional protected-training mechanism: q={Q}, sigma={SIGMA}, steps={ROUNDS*STEPS}, delta={DELTA}, integer-RDP epsilon<={eps:.6f} (alpha={order})',flush=True)
     rows=[]
     for s in range(a.seed_start,a.seed_start+a.seeds):
-        rows.extend(experiment(X,y,limit,s));pd.DataFrame(rows).to_csv(a.out,index=False)
+        rows.extend(experiment(X,y,limit,ids,s));pd.DataFrame(rows).to_csv(a.out,index=False)
         print('finished',s,flush=True)
     print('rows',len(rows),flush=True)
 if __name__=='__main__':main()
