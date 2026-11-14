@@ -72,8 +72,10 @@ def train(cl,seed,mode):
             t=th.copy();n=len(y)
             for __ in range(STEPS):
                 sel=np.flatnonzero(rng.random_sample(n)<Q)
-                if not len(sel):continue
-                G=gradients(x[sel],y[sel],t)
+                # The private mechanism must add Gaussian noise even when the
+                # Poisson minibatch is empty; skipping would change the mechanism.
+                if not len(sel) and mode!='private':continue
+                G=gradients(x[sel],y[sel],t) if len(sel) else np.zeros((0,d+1))
                 norms=np.linalg.norm(G,axis=1)
                 Gc=G*np.minimum(1.,CLIP/(norms+1e-12))[:,None]
                 if mode=='unclipped':g=G.sum(0)
