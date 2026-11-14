@@ -1,0 +1,48 @@
+name: Paper III 100-seed reviewer experiments
+on:
+  push:
+    paths:
+      - '.github/workflows/paper3-reviewer-experiments.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiments:
+    name: ${{ matrix.mode }} seeds ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        mode: [matched, control, calibration]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install analysis dependencies
+        run: pip install numpy pandas scipy scikit-learn xlrd
+      - name: Retrieve and verify original dataset
+        shell: bash
+        run: |
+          mkdir -p paper3/results
+          curl -fsSL --retry 5 'https://raw.githubusercontent.com/neurospin/pystatsml/master/datasets/default%20of%20credit%20card%20clients.xls' -o paper3/results/taiwan.xls
+          echo '30c6be3abd8dcfd3e6096c828bad8c2f011238620f5369220bd60cfc82700933  paper3/results/taiwan.xls' | sha256sum -c -
+      - name: Execute independent seed shard
+        env:
+          MODE: ${{ matrix.mode }}
+          SHARD: ${{ matrix.shard }}
+        shell: bash
+        run: |
+          START=$((17286 + 10 * SHARD))
+          python paper3/paper3_controlled_experiments_corrected.py --mode "$MODE" --data paper3/results/taiwan.xls --seeds 10 --seed-start "$START" --out "paper3/results/${MODE}_shard_${SHARD}.csv"
+      - name: Upload raw experimental outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper3-${{ matrix.mode }}-shard-${{ matrix.shard }}
+          path: paper3/results/*.csv
+          if-no-files-found: warn
+          retention-days: 90
